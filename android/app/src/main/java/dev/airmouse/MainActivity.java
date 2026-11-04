@@ -113,7 +113,7 @@ public final class MainActivity extends Activity implements SensorEventListener 
         add(root, pairing, 22);
         pairingHeading = label("PAIR WITH YOUR MAC", 11, MINT);
         add(pairing, pairingHeading, 0);
-        hostInput = field("Mac address · e.g. 192.168.1.5", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        hostInput = field("Mac IPv4 or IPv6 address", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         hostInput.setText(preferences.getString("host", ""));
         add(pairing, hostInput, 12);
         codeInput = field("12-character pairing code", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
@@ -197,20 +197,11 @@ public final class MainActivity extends Activity implements SensorEventListener 
             return;
         }
         if (rotation == null) return;
-        String host = hostInput.getText().toString().trim();
+        String host = NetworkAddress.normalize(hostInput.getText().toString());
         String code = codeInput.getText().toString().replaceAll("[\\s-]", "").toUpperCase(Locale.US);
-        // Restrict to a literal LAN IPv4 address; no remote hostname lookup.
-        String[] octets = host.split("\\.", -1);
-        boolean valid = octets.length == 4;
-        try {
-            for (String octet : octets) {
-                if (!octet.matches("[0-9]{1,3}") || Integer.parseInt(octet) > 255) valid = false;
-            }
-            int a = Integer.parseInt(octets[0]);
-            int b = octets.length > 1 ? Integer.parseInt(octets[1]) : -1;
-            valid &= a == 10 || (a == 172 && b >= 16 && b <= 31) || (a == 192 && b == 168) || (a == 169 && b == 254);
-        } catch (NumberFormatException | ArrayIndexOutOfBoundsException ignored) { valid = false; }
-        if (!valid) { hostInput.setError("Enter your Mac’s local IPv4 address"); return; }
+        if (!NetworkAddress.valid(host)) {
+            hostInput.setError("Enter the Mac’s IPv4 or IPv6 address shown in AirMouse"); return;
+        }
         if (!code.matches("[0-9A-F]{12}")) { codeInput.setError("Enter the 12-character code shown on Mac"); return; }
         preferences.edit().putString("host", host).apply();
         InputMethodManager keyboard = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);

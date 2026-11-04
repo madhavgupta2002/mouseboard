@@ -128,6 +128,17 @@ try:
         except urllib.error.HTTPError as error:
             assert error.code == 404
     passed.append("installation link protected; unknown paths rejected")
+    c = socket.create_connection(("::1", 47821), timeout=2)
+    f = c.makefile("rwb", buffering=0)
+    send(f, {"type": "hello", "version": 1, "code": CODE})
+    assert json.loads(f.readline())["type"] == "welcome"
+    send(f, {"type": "bye"})
+    assert f.readline() == b""
+    f.close(); c.close()
+    passed.append("IPv6 phone connection accepted")
+    ipv6page = http.open("http://[::1]:47822/" + TOKEN, timeout=3).read().decode()
+    assert "airmouse://connect" in ipv6page and "Download Android app" in ipv6page
+    passed.append("IPv6 installation page served")
     print("\n".join("PASS: " + test for test in passed))
     print(f"\n{len(passed)} integration checks passed; no OS mouse events were injected.")
 finally:

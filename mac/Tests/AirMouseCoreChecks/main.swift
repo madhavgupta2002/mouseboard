@@ -36,4 +36,6 @@ let displays = [CGRect(x: 0, y: 0, width: 100, height: 100),
 try check(PointerMath.constrain(CGPoint(x: -20, y: 20), to: displays) == CGPoint(x: -20, y: 20), "negative display origin supported")
 try check(PointerMath.constrain(CGPoint(x: 110, y: 120), to: displays) == CGPoint(x: 99, y: 99), "pointer clamped to display edge")
 try check(PointerMath.constrain(CGPoint(x: -5, y: 60), to: displays) == CGPoint(x: 0, y: 60), "gap projects to nearest display")
+try check(LocalAddress.httpHost("192.168.1.2") == "192.168.1.2", "IPv4 URL host unchanged")
+try check(LocalAddress.httpHost("2403::1") == "[2403::1]", "IPv6 URL host bracketed")
 print("\(checks) core checks passed.")

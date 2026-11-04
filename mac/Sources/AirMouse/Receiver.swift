@@ -39,7 +39,7 @@ final class Receiver: ObservableObject {
         rotateCode()
     }
 
-    var installURL: String { "http://\(selectedAddress):\(webPort)/\(installToken)" }
+    var installURL: String { "http://\(LocalAddress.httpHost(selectedAddress)):\(webPort)/\(installToken)" }
 
     func start() {
         guard listener == nil else { refreshAddresses(); return }
@@ -123,7 +123,8 @@ final class Receiver: ObservableObject {
         while let interface = pointer {
             defer { pointer = interface.pointee.ifa_next }
             let item = interface.pointee
-            guard let addr = item.ifa_addr, addr.pointee.sa_family == UInt8(AF_INET),
+            guard let addr = item.ifa_addr,
+                  addr.pointee.sa_family == UInt8(AF_INET) || addr.pointee.sa_family == UInt8(AF_INET6),
                   (item.ifa_flags & UInt32(IFF_UP)) != 0,
                   (item.ifa_flags & UInt32(IFF_LOOPBACK)) == 0 else { continue }
             let name = String(cString: item.ifa_name)
@@ -131,13 +132,24 @@ final class Receiver: ObservableObject {
             var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
             if getnameinfo(addr, socklen_t(addr.pointee.sa_len), &host, socklen_t(host.count),
                            nil, 0, NI_NUMERICHOST) == 0 {
-                result.append((name, String(cString: host)))
+                let address = String(cString: host)
+                // A link-local IPv6 zone is different on each device. Advertise
+                // unscoped global/ULA addresses that a phone can actually use.
+                if !address.contains("%") && address != "::1" {
+                    result.append((name, address))
+                }
             }
         }
-        let current = result.sorted { $0.0 < $1.0 }.map(\.1)
+        let current = result.sorted {
+            if $0.0 != $1.0 { return $0.0 < $1.0 }
+            if $0.1.contains(":") != $1.1.contains(":") { return !$0.1.contains(":") }
+            return $0.1 < $1.1
+        }.map(\.1)
         // Avoid redrawing the QR every second when the network is unchanged.
         if addresses != current { addresses = current }
-        if !current.contains(selectedAddress) { selectedAddress = current.first ?? "" }
+        if !current.contains(selectedAddress) {
+            selectedAddress = current.first(where: { $0.contains(":") }) ?? current.first ?? ""
+        }
     }
 
     func rotateCode() {

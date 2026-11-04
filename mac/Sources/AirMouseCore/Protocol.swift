@@ -39,6 +39,12 @@ public struct LineBuffer {
 
 public enum ProtocolError: Error { case oversized }
 
+public enum LocalAddress {
+    public static func httpHost(_ address: String) -> String {
+        address.contains(":") ? "[\(address)]" : address
+    }
+}
+
 public enum PointerMath {
     /// Screen bounds use Quartz's global, top-left coordinate space.
     /// Choose the nearest display when a proposed position falls into a gap.

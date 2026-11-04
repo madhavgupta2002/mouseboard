@@ -52,8 +52,16 @@ focused. The Mac also has an AirMouse menu bar control.
   firewall and Local Network settings. The whole link, including its random
   path, is required. The QR updates automatically when the Mac's network address
   changes; rescan the current QR instead of reopening a saved old link.
-- **Guest/office Wi-Fi:** it may prevent devices talking to each other. Try a
-  private home network or a hotspot with both devices on the same network.
+- **IPv4 is unreachable:** choose an **IPv6** entry under Mac address and rescan
+  the updated QR. AirMouse supports both address families and prefers IPv6 when
+  the Mac has a usable global or local IPv6 address. This offers another direct
+  path on the same Wi-Fi; it does not override network isolation.
+- **Guest/office Wi-Fi or `ERR_ADDRESS_UNREACHABLE`:** the phone cannot reach
+  the Mac address. Even devices on the same Wi-Fi name can be separated by
+  network policy. Turn on the phone’s Mobile Hotspot, connect the Mac to it,
+  and scan the newly updated QR. This tests a direct path without changing
+  company firewall settings. If it still fails, compare the phone’s network
+  address and the address displayed by AirMouse before changing the app.
 - **Connected but no pointer movement:** enable AirMouse under Accessibility
   and resume control on both devices. If you moved or rebuilt the Mac app,
   remove the old Accessibility entry and add the current app again.
@@ -134,7 +142,7 @@ or grant these permissions for you.
 
 - Mac receiver and Android controller; no Windows/Linux receiver yet.
 - Left/right click and double-click; scrolling and dragging are not implemented.
-- Local IPv4 networking; no Bluetooth, USB, Internet relay, or automatic discovery.
+- Local IPv4/IPv6 networking; no Bluetooth, USB, Internet relay, or automatic discovery.
 - One connected phone. A random pairing code authorizes input.
 - The installer is protected by a separate random link.
 - Traffic is **not encrypted**. Use a trusted private network; this prototype

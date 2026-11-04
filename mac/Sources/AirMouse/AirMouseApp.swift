@@ -16,7 +16,7 @@ struct AirMouseApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in receiver.stop() }
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 820, height: 670)
+        .defaultSize(width: 820, height: 760)
         .windowResizability(.contentSize)
         MenuBarExtra("AirMouse", systemImage: "cursorarrow.motionlines") {
             Text(receiver.status)
@@ -104,8 +104,13 @@ private struct ReceiverView: View {
                     Text("MAC ADDRESS").font(.system(size: 10, weight: .bold)).tracking(1).foregroundColor(subtle)
                     if receiver.addresses.count > 1 {
                         Picker("Network address", selection: $receiver.selectedAddress) {
-                            ForEach(receiver.addresses, id: \.self) { Text($0).tag($0) }
-                        }.labelsHidden()
+                            ForEach(receiver.addresses, id: \.self) {
+                                Text(($0.contains(":") ? "IPv6 · " : "IPv4 · ") + $0).tag($0)
+                            }
+                        }.labelsHidden().pickerStyle(.menu).frame(maxWidth: 285)
+                        Text(receiver.selectedAddress)
+                            .font(.system(size: 11, design: .monospaced))
+                            .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
                     } else {
                         Text(receiver.selectedAddress.isEmpty ? "No network" : receiver.selectedAddress)
                             .font(.system(size: 20, weight: .medium, design: .monospaced)).textSelection(.enabled)
@@ -116,6 +121,11 @@ private struct ReceiverView: View {
                     HStack {
                         Button("Copy code") { copy(receiver.code) }
                         Button("New code") { receiver.rotateCode() }
+                    }
+                    if receiver.addresses.contains(where: { $0.contains(":") }) {
+                        Text("Link unreachable? Choose IPv6 above and scan the updated QR.")
+                            .font(.system(size: 11)).foregroundColor(subtle)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Text("Hold the phone screen-up near horizontal.\nTap Recenter, then tilt gently to move.").font(.system(size: 12)).foregroundColor(subtle)
                     Button("Refresh network", systemImage: "arrow.clockwise") { receiver.refreshAddresses() }
