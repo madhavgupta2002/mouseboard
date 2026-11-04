@@ -1,0 +1,6 @@
+.tools/
+mac/.build/
+android/build/
+dist/
+.DS_Store
+*.keystore

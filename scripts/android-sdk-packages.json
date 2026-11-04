@@ -1,0 +1,12 @@
+{
+  "platforms;android-35": {
+    "folder": "platforms/android-35",
+    "url": "https://dl.google.com/android/repository/platform-35-ext15_r01.zip",
+    "sha1": "ce757091f933b7ac646bf197ce8957cc73b95614"
+  },
+  "build-tools;35.0.0": {
+    "folder": "build-tools/35.0.0",
+    "url": "https://dl.google.com/android/repository/build-tools_r35_macosx.zip",
+    "sha1": "93ab8ce91230e067b5add4bfa79919c52b27f072"
+  }
+}
