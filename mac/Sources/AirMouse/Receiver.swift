@@ -42,7 +42,7 @@ final class Receiver: ObservableObject {
     var installURL: String { "http://\(selectedAddress):\(webPort)/\(installToken)" }
 
     func start() {
-        guard listener == nil else { return }
+        guard listener == nil else { refreshAddresses(); return }
         refreshAddresses()
         hasPermission = mouse.hasPermission
         do {
@@ -86,6 +86,9 @@ final class Receiver: ObservableObject {
         }
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
+            // Wi-Fi changes, DHCP renewal and wake can invalidate a displayed QR
+            // without restarting the listeners, which bind to all interfaces.
+            self.refreshAddresses()
             let permission = self.mouse.hasPermission
             if self.hasPermission != permission {
                 self.hasPermission = permission
@@ -131,8 +134,10 @@ final class Receiver: ObservableObject {
                 result.append((name, String(cString: host)))
             }
         }
-        addresses = result.sorted { $0.0 < $1.0 }.map(\.1)
-        if !addresses.contains(selectedAddress) { selectedAddress = addresses.first ?? "" }
+        let current = result.sorted { $0.0 < $1.0 }.map(\.1)
+        // Avoid redrawing the QR every second when the network is unchanged.
+        if addresses != current { addresses = current }
+        if !current.contains(selectedAddress) { selectedAddress = current.first ?? "" }
     }
 
     func rotateCode() {

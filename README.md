@@ -50,7 +50,8 @@ focused. The Mac also has an AirMouse menu bar control.
 - **QR page will not load:** verify the same network, choose the correct address
   in the Mac app if it lists several, and allow AirMouse through the macOS
   firewall and Local Network settings. The whole link, including its random
-  path, is required.
+  path, is required. The QR updates automatically when the Mac's network address
+  changes; rescan the current QR instead of reopening a saved old link.
 - **Guest/office Wi-Fi:** it may prevent devices talking to each other. Try a
   private home network or a hotspot with both devices on the same network.
 - **Connected but no pointer movement:** enable AirMouse under Accessibility
