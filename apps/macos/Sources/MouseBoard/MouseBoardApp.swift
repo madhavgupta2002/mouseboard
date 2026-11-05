@@ -63,6 +63,16 @@ private struct BluetoothSetupView: View {
                 Text(setup.bluetoothOn ? "Bluetooth is on" : "Turn on Bluetooth")
                     .font(.system(size: 12)).foregroundColor(subtle)
             }
+            if setup.inputProfile == .legacyMouse {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Old mouse profile detected").font(.system(size: 14, weight: .semibold))
+                    Text("After upgrading from the mouse-only app, the old pairing can shift input bytes and cause vertical-only movement. Forget this pairing on both devices, pair again, then connect from MouseBoard.")
+                        .font(.system(size: 12)).fixedSize(horizontal: false, vertical: true)
+                    Button("Open Bluetooth settings") { setup.openSettings() }
+                }
+                .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.12)).cornerRadius(12)
+            }
             HStack {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("MouseBoard.").font(.system(size: 47, weight: .semibold, design: .rounded)).tracking(-2)

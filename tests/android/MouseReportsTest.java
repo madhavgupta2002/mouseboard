@@ -12,7 +12,7 @@ public final class MouseReportsTest {
     private static void report(MouseReports queue, int buttons, int x, int y, String name) {
         check(Arrays.equals(queue.next(), new byte[]{(byte)buttons, (byte)x, (byte)y, 0}), name);
     }
-    public static void main(String[] args) {
+    public static void main(String[] args) throws java.io.IOException {
         MouseReports q = new MouseReports();
         check(q.next() == null, "idle mouse sends no movement");
         q.move(.4, -.4); check(q.next() == null, "fractional movement is retained");
@@ -102,5 +102,8 @@ public final class MouseReportsTest {
             ((center[2]&255) | ((center[3]&255)<<8)) == 16384,
             "recenter targets the midpoint of both absolute axes");
         System.out.println(checks + " Bluetooth report checks passed.");
+        if (args.length == 1) {
+            java.nio.file.Files.write(java.nio.file.Paths.get(args[0]), HidDescriptor.BYTES);
+        }
     }
 }

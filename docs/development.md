@@ -53,6 +53,14 @@ The host can send keyboard LED state as a one-byte output report on ID 2.
 Mouse button transitions and key-down/key-up pairs use bounded queues.
 Pause/disconnect sends neutral mouse and keyboard reports.
 
+The original mouse-only edition used three bytes and no report ID. A host that
+keeps that old descriptor while receiving a numbered mouse report reads the
+button byte as X and horizontal movement as Y. This was observed in the affected
+Mac's live IORegistry after the UI/keyboard upgrade. Re-pairing both devices
+refreshes the descriptor. The Mac helper inspects the selected phone's active
+HID profile and warns about the legacy format; regression checks reproduce the
+byte shift and validate the current descriptor exported by the Android tests.
+
 The keyboard bridge uses the phone's normal input method and applies suffix
 edits for English composition and autocorrection. It does not read the
 computer's text or inject commands through a desktop receiver.
@@ -77,6 +85,9 @@ angular wrapping and position hysteresis.
 The Java tests cover motion noise, slow aiming, fast sweeps, sample-rate
 consistency, drag persistence, cancellation, scrolling, report descriptors,
 keyboard mapping, queue bounds and IME suffix edits.
+
+Full verification also runs Swift checks for stale HID profiles and report-ID
+alignment. Reading the active profile does not capture keyboard or mouse input.
 
 Artifact checks inspect the built APK's permissions/version and verify APK/Mac
 signatures. They do not prove a physical HID connection, native phone layout,

@@ -15,8 +15,14 @@ javac --release 8 -d "$ROOT/apps/android/build/tests" \
   "$ROOT/apps/android/app/src/main/java/dev/airmouse/TextEdit.java" "$ROOT/tests/android/MotionStabilityTest.java"
 java -cp "$ROOT/apps/android/build/tests" dev.airmouse.MotionMathTest
 java -cp "$ROOT/apps/android/build/tests" dev.airmouse.MotionStabilityTest
-java -cp "$ROOT/apps/android/build/tests" dev.airmouse.MouseReportsTest
+java -cp "$ROOT/apps/android/build/tests" dev.airmouse.MouseReportsTest \
+  "$ROOT/apps/android/build/tests/hid-descriptor.bin"
 java -cp "$ROOT/apps/android/build/tests" dev.airmouse.KeyboardReportsTest
 if [[ "$MODE" != "--unit-only" ]]; then
+  mkdir -p "$ROOT/apps/macos/.build"
+  swiftc "$ROOT/apps/macos/Sources/MouseBoard/HidInputProfile.swift" \
+    "$ROOT/tests/macos/main.swift" -o "$ROOT/apps/macos/.build/hid-profile-checks"
+  "$ROOT/apps/macos/.build/hid-profile-checks" \
+    "$ROOT/apps/android/build/tests/hid-descriptor.bin"
   python3 "$ROOT/scripts/verify-bluetooth.py"
 fi

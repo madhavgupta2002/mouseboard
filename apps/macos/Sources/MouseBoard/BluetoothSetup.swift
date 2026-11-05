@@ -13,6 +13,7 @@ final class BluetoothSetup: ObservableObject {
     @Published var bluetoothOn = false
     @Published var transferStatus = "The installer is sent directly over Bluetooth."
     @Published var sending = false
+    @Published var inputProfile = HidInputProfile.notConnected
     let macName = Host.current().localizedName ?? "this Mac"
     private var timer: Timer?
 
@@ -49,6 +50,7 @@ final class BluetoothSetup: ObservableObject {
         if !devices.contains(where: { $0.id == selectedAddress }) {
             selectedAddress = devices.first?.id ?? ""
         }
+        inputProfile = HidInputProfile.current(for: selectedAddress)
     }
 
     func openSettings() {
@@ -117,6 +119,7 @@ final class BluetoothSetup: ObservableObject {
             "bluetoothOn": bluetoothOn,
             "mac": macName,
             "installerPresent": apkURL != nil,
+            "inputProfile": inputProfile.rawValue,
             "devices": devices.map { ["name": $0.name, "address": $0.id, "connected": $0.connected] as [String: Any] }
         ]
     }

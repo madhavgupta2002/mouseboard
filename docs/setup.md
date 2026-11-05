@@ -14,6 +14,16 @@ If upgrading from an older mouse-only build, the computer may have cached the
 old HID descriptor. If new controls fail, remove the old pairing on both devices,
 pair again, and reconnect with MouseBoard open.
 
+If the pointer moves only vertically, this can be the same pairing mismatch:
+the old three-byte format reads the new report-ID byte as buttons, the button
+byte as X, and X movement as Y. Changing motion sensitivity or reinstalling the
+APK does not clear the computer's cached format. The Mac companion detects this
+old active profile and displays **Old mouse profile detected**.
+
+To repair it, forget the phone in the Mac's Bluetooth settings and unpair the
+Mac in the phone's Bluetooth settings. Pair again, then return to MouseBoard
+on the phone and tap **Connect**.
+
 ## macOS
 
 Open `dist/MouseBoard.app`, or use `Open MouseBoard.command` after building.
