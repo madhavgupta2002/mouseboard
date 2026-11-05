@@ -20,11 +20,13 @@ final class HidMouseConnection {
     private final Listener listener;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final MouseReports reports = new MouseReports();
+    private final KeyboardReports keyboard = new KeyboardReports();
     private final Object outputLock = new Object();
     private final ScheduledExecutorService sender = Executors.newSingleThreadScheduledExecutor();
     private volatile BluetoothHidDevice hid;
     private volatile BluetoothDevice target;
     private volatile boolean connected, active = true;
+    private boolean centerPending;
     private volatile long generation;
 
     HidMouseConnection(Context context, BluetoothAdapter adapter, Listener listener) {
@@ -75,8 +77,8 @@ final class HidMouseConnection {
         BluetoothHidDevice service = hid;
         if (service == null || id != generation) return;
         BluetoothHidDeviceAppSdpSettings settings = new BluetoothHidDeviceAppSdpSettings(
-            "AirMouse", "Motion-controlled Bluetooth mouse", "AirMouse",
-            BluetoothHidDevice.SUBCLASS1_MOUSE, MouseReports.DESCRIPTOR.clone());
+            "AirMouse", "Motion mouse and keyboard", "AirMouse",
+            BluetoothHidDevice.SUBCLASS1_COMBO, HidDescriptor.BYTES.clone());
         try {
             boolean accepted = service.registerApp(settings, null, null, main::post, new BluetoothHidDevice.Callback() {
                 @Override public void onAppStatusChanged(BluetoothDevice pluggedDevice, boolean registered) {
@@ -109,19 +111,36 @@ final class HidMouseConnection {
                 @Override public void onGetReport(BluetoothDevice device, byte type, byte reportId, int size) {
                     if (id != generation || !isTarget(device) || hid == null) return;
                     try {
-                        if (type == BluetoothHidDevice.REPORT_TYPE_INPUT && reportId == 0) {
-                            hid.replyReport(device, type, reportId, reports.current());
+                        byte[] value = reportId == HidDescriptor.MOUSE ? reports.current()
+                            : reportId == HidDescriptor.KEYBOARD ? keyboard.current()
+                            : reportId == HidDescriptor.CENTER ? HidDescriptor.CENTER_REPORT.clone() : null;
+                        if (type == BluetoothHidDevice.REPORT_TYPE_INPUT && value != null) {
+                            hid.replyReport(device, type, reportId, value);
                         } else hid.reportError(device, BluetoothHidDevice.ERROR_RSP_INVALID_RPT_ID);
                     } catch (SecurityException denied) { fail(id, "Bluetooth permission was revoked."); }
                 }
                 @Override public void onSetReport(BluetoothDevice device, byte type, byte reportId, byte[] data) {
                     if (id != generation || !isTarget(device) || hid == null) return;
-                    try { hid.reportError(device, BluetoothHidDevice.ERROR_RSP_UNSUPPORTED_REQ); }
+                    try {
+                        boolean led = type == BluetoothHidDevice.REPORT_TYPE_OUTPUT &&
+                            reportId == HidDescriptor.KEYBOARD && data != null && data.length == 1;
+                        if (led) keyboard.setCapsLock((data[0] & 2) != 0);
+                        hid.reportError(device, led ? BluetoothHidDevice.ERROR_RSP_SUCCESS :
+                            BluetoothHidDevice.ERROR_RSP_UNSUPPORTED_REQ);
+                    }
                     catch (SecurityException denied) { fail(id, "Bluetooth permission was revoked."); }
                 }
+                @Override public void onInterruptData(BluetoothDevice device, byte reportId, byte[] data) {
+                    if (id == generation && isTarget(device) && reportId == HidDescriptor.KEYBOARD &&
+                            data != null && data.length == 1) keyboard.setCapsLock((data[0] & 2) != 0);
+                }
                 @Override public void onSetProtocol(BluetoothDevice device, byte protocol) {
-                    // Boot and report protocols intentionally share the same
-                    // three-byte format, so neither needs a format switch.
+                    // The composite descriptor uses report protocol (modern macOS).
+                    if (id == generation && isTarget(device) &&
+                            protocol != BluetoothHidDevice.PROTOCOL_REPORT_MODE && hid != null) {
+                        try { hid.reportError(device, BluetoothHidDevice.ERROR_RSP_UNSUPPORTED_REQ); }
+                        catch (SecurityException denied) { fail(id, "Bluetooth permission was revoked."); }
+                    }
                 }
                 @Override public void onVirtualCableUnplug(BluetoothDevice device) {
                     if (isTarget(device)) fail(id, "Mac removed the mouse. Pair the phone again before reconnecting.");
@@ -135,6 +154,7 @@ final class HidMouseConnection {
         if (id != generation || !isTarget(device)) return;
         connected = true;
         reports.clear();
+        keyboard.clear();
         publish(id, "Bluetooth connected · " + deviceName(device), true, false);
     }
 
@@ -145,12 +165,33 @@ final class HidMouseConnection {
 
     void move(double x, double y) { if (connected && active) reports.move(x, y); }
     void click(String button) { if (connected && active) reports.click(button); }
+    void button(String button, boolean down) { if (connected && active) reports.button(button, down); }
+    void scroll(double steps) { if (connected && active) reports.scroll(steps); }
     void clearMotion() { reports.clearMotion(); }
+    KeyboardReports.Result edit(int backspaces, String text) {
+        synchronized (outputLock) {
+            return connected && active ? keyboard.edit(backspaces, text) : KeyboardReports.Result.FULL;
+        }
+    }
+    KeyboardReports.Result key(int usage, int modifiers) {
+        synchronized (outputLock) {
+            return connected && active ? keyboard.key(usage, modifiers) : KeyboardReports.Result.FULL;
+        }
+    }
+    void center() {
+        synchronized (outputLock) {
+            if (!connected || !active) return;
+            reports.clear();
+            centerPending = true;
+        }
+    }
 
     void setActive(boolean value) {
         synchronized (outputLock) {
             active = value;
             reports.clear();
+            keyboard.clear();
+            centerPending = false;
             releaseButtons();
         }
     }
@@ -161,11 +202,21 @@ final class HidMouseConnection {
             BluetoothDevice device = target;
             long id = generation;
             if (!connected || !active || proxy == null || device == null) return;
-            byte[] report = reports.next();
-            if (report == null) return;
             try {
-                if (!proxy.sendReport(device, 0, report)) {
-                    fail(id, "Bluetooth could not send mouse input. Tap Connect to retry.");
+                if (centerPending) {
+                    centerPending = false;
+                    if (!proxy.sendReport(device, HidDescriptor.MOUSE, new byte[4]) ||
+                            !proxy.sendReport(device, HidDescriptor.CENTER, HidDescriptor.CENTER_REPORT)) {
+                        fail(id, "Could not center the pointer. Reconnect and try again."); return;
+                    }
+                }
+                byte[] report = reports.next();
+                if (report != null && !proxy.sendReport(device, HidDescriptor.MOUSE, report)) {
+                    fail(id, "Bluetooth could not send mouse input. Tap Connect to retry."); return;
+                }
+                byte[] keys = keyboard.next();
+                if (keys != null && !proxy.sendReport(device, HidDescriptor.KEYBOARD, keys)) {
+                    fail(id, "Bluetooth could not send keyboard input. Tap Connect to retry.");
                 }
             } catch (RuntimeException error) { fail(id, "Bluetooth connection lost. Tap Connect to retry."); }
         }
@@ -175,7 +226,10 @@ final class HidMouseConnection {
         BluetoothHidDevice proxy = hid;
         BluetoothDevice device = target;
         if (connected && proxy != null && device != null) {
-            try { proxy.sendReport(device, 0, new byte[]{0, 0, 0}); }
+            try {
+                proxy.sendReport(device, HidDescriptor.MOUSE, new byte[4]);
+                proxy.sendReport(device, HidDescriptor.KEYBOARD, new byte[8]);
+            }
             catch (RuntimeException ignored) { }
         }
     }
@@ -188,6 +242,8 @@ final class HidMouseConnection {
             releaseButtons();
             connected = false;
             reports.clear();
+            keyboard.clear();
+            centerPending = false;
             proxy = hid;
             device = target;
             hid = null;

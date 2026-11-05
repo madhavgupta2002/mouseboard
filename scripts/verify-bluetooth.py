@@ -19,8 +19,8 @@ assert names == expected, f"Unexpected APK permissions: {names}"
 assert "android.permission.INTERNET" not in permissions
 print("PASS: APK requests Bluetooth permissions only, with no Internet access")
 assert "minSdkVersion:'28'" in badging
-assert "versionCode='3'" in badging
-assert "versionName='0.2.1'" in badging
+assert "versionCode='4'" in badging
+assert "versionName='0.3.0'" in badging
 print("PASS: Bluetooth APK version and Android 9 minimum are correct")
 assert "uses-feature: name='android.hardware.bluetooth'" in badging
 print("PASS: APK declares Bluetooth hardware support")

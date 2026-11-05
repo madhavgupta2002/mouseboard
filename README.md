@@ -1,130 +1,123 @@
 # AirMouse — Bluetooth edition
 
-Your Galaxy S24 Ultra acts as a standard Bluetooth mouse. Tilt the phone to move
-the Mac pointer, and tap the left/right pads to click. All control traffic goes
-directly over Bluetooth; the Android app has no Internet permission.
+A minimal black controller for Galaxy phones. Tilt to move the Mac pointer,
+hold a click pad to drag, swipe the middle strip to scroll, and use the phone's
+normal keyboard to type on the Mac. All input travels over Bluetooth HID.
+The Android app has no Internet permission.
 
-## Install and connect
+## Install or update
 
-1. Keep Bluetooth on. Your phone and Mac should already be paired in their system
-   Bluetooth settings.
-2. Open `dist/AirMouse.app` (or double-click `Open AirMouse.command`). The Mac app
-   is now a setup helper; it does not receive or inject mouse events.
-3. Select your phone and click **Send APK over Bluetooth**. Accept the incoming
-   file on the phone. If macOS asks whether AirMouse may control Bluetooth File
-   Exchange, allow it to start this transfer. Alternatively, use **Show APK in
-   Finder**, then send the file with macOS Bluetooth File Exchange yourself.
-4. On the phone, open the received `AirMouse-Android.apk` and install the update.
-   Allow installation from the source Android identifies when it asks. If Samsung
-   Auto Blocker prevents sideloading, use the phone's security settings to decide
-   whether to allow this locally built app; managed-device policy may prevent it.
-5. Open **AirMouse** on the phone, tap **Connect over Bluetooth**, and allow
-   **Nearby devices**. Choose your already-paired Mac from the list.
-6. Keep the phone app visible. Hold it screen-up near horizontal and tap
-   **Recenter**. Tilt its top edge up/down for vertical movement and tilt its
-   sides for horizontal movement. Tap **LEFT** or **RIGHT** to click.
+1. Open `dist/AirMouse.app` or `Open AirMouse.command` on the Mac.
+2. Select your paired phone and choose **Send APK over Bluetooth**.
+   Accept the file on the phone, open it, and install the update. The same APK
+   is also copied to `~/Documents/AirMouse-Android.apk` when prepared for use.
+3. Open **AirMouse** on the phone, allow **Nearby devices**, and tap **Connect**.
+   Select your Mac.
+4. For this 0.3.0 upgrade, macOS may have cached the old mouse-only descriptor.
+   If new controls fail, forget the phone in Mac Bluetooth settings, remove the
+   old Mac pairing on the phone, pair again, and reconnect in AirMouse.
+   Keep AirMouse open while reconnecting.
 
-You can quit the Mac setup helper after installation. macOS receives the phone
-as a real Bluetooth mouse, so this edition needs no Mac Accessibility permission,
-IP address, QR code, Wi-Fi, server, or company-network access. The phone's Pause
-button releases held mouse buttons and stops movement.
+The Mac app is an optional installer helper. Once installed, input goes directly
+to macOS; the helper can be closed. No Accessibility permission or Wi-Fi is used.
+If Android asks, allow installation from the source it identifies. Managed phone
+policy may prevent installation of locally built APKs.
 
-## Motion stability update (0.2.1)
+## Controls
 
-Install the new APK over the existing app, reconnect, and tap **Recenter**.
-Each axis now uses speed-adaptive smoothing: stronger filtering near rest,
-with faster response during deliberate movement. A small angular hysteresis
-suppresses tiny reversals without discarding accumulated slow movement.
-Sensor discontinuities reset the filters so they cannot cause delayed jumps.
-The Bluetooth pairing and controls are unchanged.
+- **Recenter:** resets the current phone grip as neutral and sends a separate
+  absolute pointer report at the midpoint of the host's mapped display area.
+  On a single display this is the centre of the screen; multi-display mapping is
+  controlled by macOS. It releases any held mouse buttons first.
+- **LEFT / RIGHT:** tap to click, or keep a finger pressed and tilt to drag.
+  Button state persists across motion and wheel reports. Lifting your finger,
+  cancelling the touch, pausing or disconnecting releases it.
+- **Middle strip:** slide vertically to send wheel events. The pointer stays
+  still while you use the scroll strip.
+- **Keyboard:** opens your phone's default keyboard in the lower screen area.
+  Click a text field on the Mac first. The phone field displays recently typed
+  text; it does not read or mirror the Mac's document. English composition is
+  sent as you type; autocorrection replaces the changed suffix.
+- **Pause:** stops input and releases mouse buttons and keyboard keys.
+- **⋯:** sensitivity, tilt/turn mode, and Bluetooth settings.
 
-## If the Mac does not accept the mouse connection
+Keep the phone app in the foreground. It intentionally disconnects if you
+switch apps or lock the phone.
 
-Ordinary phone pairing and the Bluetooth mouse profile are different things.
-If the phone app times out while connecting:
+### Keyboard scope
 
-1. Keep AirMouse open on the phone so its mouse profile stays registered.
-2. Remove/forget the old phone pairing in Mac Bluetooth settings, then pair it
-   again while AirMouse is open. Return to the phone app and choose the Mac.
-3. Close other phone apps that act as Bluetooth keyboards/mice; Android allows
-   only one app to register the HID device profile at a time.
-4. Check AirMouse's **Nearby devices** permission and that Bluetooth is on.
-5. If the app reports that the HID device profile is unavailable, that phone's
-   firmware does not expose the required Android profile. Pairing alone cannot
-   add the profile.
+Use **ABC / US** as the Mac input source. This version maps English letters,
+numbers, US punctuation, Tab, Enter and Backspace into standard keyboard reports.
+It compensates for the Mac's Caps Lock state when the host supplies LED updates.
+The phone can use Samsung Keyboard, Gboard, or another normal IME.
 
-The controller deliberately disconnects when the phone app goes into the
-background or the phone locks. Reopen it and tap **Connect over Bluetooth**.
+Emoji, other scripts and arbitrary Unicode are not implemented. Unsupported
+edits are rejected with a message, without partially deleting the Mac text.
+Large pastes are bounded; if the typing queue fills, wait for it to drain and retry.
 
-## Implementation
+## Motion filtering
 
-- Android `BluetoothHidDevice` registers a mouse-only descriptor. It sends
-  three-byte reports: mouse buttons, relative X, and relative Y.
-- The descriptor uses no report ID and matches the three-byte boot mouse format.
-  It contains no keyboard usages. Both report and boot protocol modes use the
-  same bytes.
-- Left/right clicks have separate press and release reports. Large movements are
-  split into signed-byte deltas, fractional motion is retained, and pause/stop
-  releases buttons before disconnecting.
-- Android's game rotation vector supplies calibrated orientation. No magnetic
-  compass or camera is required. A standard rotation vector is the fallback.
-- Independent per-axis adaptive filters and a 0.037-degree hysteresis reduce
-  jitter. Cutoff is 1.5 Hz at rest and rises with filtered angular speed.
-  This follows the speed-adaptive filtering approach of Casiez, Roussel, and
-  Vogel, *1 € Filter* (CHI 2012), with angular wrapping and position hysteresis.
-- The Mac helper uses IOBluetooth to display paired devices and Apple's Bluetooth
-  File Exchange to transfer the installer. It opens no network listener.
+The game rotation vector supplies calibrated orientation (standard rotation
+vector is the fallback). Each axis uses adaptive smoothing with stronger
+filtering near rest and faster response during deliberate movement, plus a
+small angular hysteresis. Slow motion accumulates across sensor samples.
+Sensor gaps and discontinuities reset the filter to prevent delayed jumps.
+This follows the speed-adaptive approach of Casiez, Roussel and Vogel's
+*1 € Filter* with angular wrapping and position hysteresis.
 
-## Build
+## Bluetooth reports
 
-Requires macOS 14+, Apple's Command Line Tools, Java 17+, and Python 3.9+.
-Android Studio, Gradle, an Apple developer account, and a Play Store account are
-not needed for this local prototype.
+Version 0.3.0 registers a composite mouse/keyboard descriptor in report mode:
+
+| Report ID | Input bytes | Purpose |
+| --- | --- | --- |
+| 1 | Buttons, signed X, signed Y, signed wheel | Relative motion, click/drag and scrolling |
+| 2 | Modifier, reserved, six key usages | Standard keyboard |
+| 3 | Unsigned 16-bit X and Y, range 0–32767 | Explicit absolute centering |
+
+The host can send a one-byte keyboard LED output report on ID 2.
+Mouse transitions and key-down/key-up pairs are preserved in bounded queues.
+Pause/disconnect sends neutral mouse and keyboard reports. Modern macOS report
+mode is required; pre-boot keyboard operation is outside this MVP.
+
+## Build and verify
+
+Requires macOS 14+, Apple's Command Line Tools, Java 17+ and Python 3.9+.
+Android SDK components are pinned under `.tools`; Android Studio and Gradle
+are not needed.
 
 ```sh
 bash scripts/build-all.sh
+bash scripts/test.sh
 open dist/AirMouse.app
 ```
 
-The Android build uses pinned official Google SDK components under `.tools` and
-signs with `.tools/airmouse-debug.keystore`. Keep that key to install future
-updates over the current app. The current APK is version **0.2.1**, version code
-**3**, and supports Android 9+ devices whose firmware enables HID device mode.
-The Mac app is locally ad-hoc signed.
+The APK is **0.3.0**, version code **4**, with Android 9 as its minimum.
+Keep `.tools/airmouse-debug.keystore` to install future updates over the current
+app. The Mac app is ad-hoc signed.
 
-## Verify
+Tests cover noisy and deliberate motion, recentering, sensor discontinuities,
+HID descriptor lengths and report IDs, drag persistence, release/cancellation,
+wheel accumulation, keyboard mapping and queue limits, IME suffix edits,
+Bluetooth-only permissions, versions and signatures.
 
-```sh
-bash scripts/test.sh
-```
+Host report encoding tests do not replace a physical-phone test. The actual
+phone keyboard layout, HID reconnection, display mapping and cursor centering
+must be checked after installing on the S24. Local virtual-HID injection was
+unavailable to the build process, so absolute centering has not been verified
+against the physical Mac/phone link.
 
-The checks cover calibrated sensor motion, simulated stationary noise,
-slow aiming, fast sweeps, sample-rate consistency, recentering and sensor
-discontinuities, the real HID report descriptor,
-fractional/clamped movement, left/right and double-click ordering, queue limits,
-button release, APK permissions/version, and signatures. The APK must contain
-Bluetooth permissions only and no Internet permission.
-
-The Mac companion can also print its view of the system pairing:
+The Mac helper can print pairing diagnostics:
 
 ```sh
 dist/AirMouse.app/Contents/MacOS/AirMouse --diagnostics
 ```
 
-A physical phone is still needed to verify registration, the Bluetooth HID link,
-and actual cursor movement. Automated packet checks do not prove that the phone
-has accepted or sent those packets over its Bluetooth radio.
-
 ## Files
 
-- `android/app/src/main/java/dev/airmouse/` — phone UI, motion math, HID connection,
-  and mouse-report queue.
-- `mac/Sources/AirMouse/` — Bluetooth setup and installer transfer helper.
-- `scripts/` — local build and verification.
-- `dist/AirMouse-Android.apk` — install this on the phone.
-- `dist/AirMouse.app` — optional Mac setup helper.
-- `dist/AirMouse-WiFi-source-backup.tar.gz` — source snapshot of the previous
-  Wi-Fi edition, preserved before the Bluetooth conversion.
-
-Scrolling, dragging, background phone operation, and a store release are outside
-this MVP. The existing left/right pads provide clicks and double-clicks.
+- `android/app/src/main/java/dev/airmouse/` — phone UI, motion, IME bridge, HID.
+- `mac/Sources/AirMouse/` — installer helper.
+- `scripts/` — local builds and checks.
+- `dist/AirMouse-Android.apk` — phone installer.
+- `dist/AirMouse.app` — optional Mac installer helper.
+- `dist/AirMouse-WiFi-source-backup.tar.gz` — preserved original Wi-Fi source.

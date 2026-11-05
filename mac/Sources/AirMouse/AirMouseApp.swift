@@ -50,8 +50,8 @@ struct AirMouseApp: App {
 
 private struct BluetoothSetupView: View {
     @ObservedObject var setup: BluetoothSetup
-    private let mint = Color(red: 0.53, green: 0.92, blue: 0.77)
-    private let subtle = Color(red: 0.64, green: 0.70, blue: 0.77)
+    private let mint = Color.white
+    private let subtle = Color(white: 0.6)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 25) {
@@ -65,8 +65,8 @@ private struct BluetoothSetupView: View {
             }
             HStack {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Point without\nWi-Fi.").font(.system(size: 47, weight: .semibold, design: .rounded)).tracking(-2)
-                    Text("Your Galaxy becomes a standard Bluetooth mouse.")
+                    Text("AirMouse.").font(.system(size: 47, weight: .semibold, design: .rounded)).tracking(-2)
+                    Text("Mouse, scroll and keyboard. Over Bluetooth.")
                         .font(.system(size: 14)).foregroundColor(subtle)
                 }
                 Spacer()
@@ -110,11 +110,13 @@ private struct BluetoothSetupView: View {
                     section("02", "CONNECT & POINT")
                     instruction("1", "Open AirMouse on your phone.",
                                 "Allow Nearby devices when asked.")
-                    instruction("2", "Tap Connect over Bluetooth.",
+                    instruction("2", "Tap Connect.",
                                 "Choose \(setup.macName) from the paired-device list.")
                     instruction("3", "Hold the phone screen-up.",
-                                "Tap Recenter, then tilt gently. Tap LEFT or RIGHT to click.")
-                    Text("Keep the phone app open. Pause or disconnect from the phone.")
+                                "Recenter resets your grip and sends the pointer to the screen centre.")
+                    instruction("4", "Click, drag, scroll or type.",
+                                "Hold LEFT and tilt to drag. Swipe the middle strip to scroll. Tap Keyboard to type.")
+                    Text("Keep the phone app open. Typing uses the Mac’s ABC / US input source.")
                         .font(.system(size: 12)).foregroundColor(subtle)
                         .fixedSize(horizontal: false, vertical: true)
                 }.frame(maxWidth: .infinity, alignment: .leading)
@@ -122,19 +124,19 @@ private struct BluetoothSetupView: View {
             HStack(spacing: 14) {
                 Image(systemName: "checkmark.shield").font(.system(size: 24)).foregroundColor(mint)
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("macOS receives mouse input directly.").font(.system(size: 14, weight: .semibold))
+                    Text("Input goes directly to macOS.").font(.system(size: 14, weight: .semibold))
                     Text("No desktop receiver or Accessibility permission needed. You can quit this helper after installation.")
                         .font(.system(size: 11)).foregroundColor(subtle)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Text("BLUETOOTH ONLY  ·  NO NETWORK CONNECTION  ·  NO ACCOUNT")
+            Text("BLUETOOTH ONLY  ·  v0.3.0")
                 .font(.system(size: 9, weight: .medium)).tracking(1).foregroundColor(subtle)
         }
         .buttonStyle(.bordered)
         .padding(.horizontal, 34).padding(.vertical, 30)
         .frame(width: 800)
-        .background(Color(red: 0.047, green: 0.075, blue: 0.11))
+        .background(Color.black)
         .foregroundColor(Color(red: 0.95, green: 0.97, blue: 0.99))
         .preferredColorScheme(.dark)
     }

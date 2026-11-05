@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.airmouse"
-    android:versionCode="3" android:versionName="0.2.1">
+    android:versionCode="4" android:versionName="0.3.0">
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
@@ -10,6 +10,7 @@
     <application android:theme="@style/AppTheme" android:label="AirMouse"
         android:icon="@drawable/icon" android:allowBackup="false" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true"
+            android:windowSoftInputMode="adjustResize|stateAlwaysHidden"
             android:screenOrientation="portrait" android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

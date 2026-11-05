@@ -10,7 +10,7 @@ public final class MouseReportsTest {
         System.out.println("PASS: " + name);
     }
     private static void report(MouseReports queue, int buttons, int x, int y, String name) {
-        check(Arrays.equals(queue.next(), new byte[]{(byte)buttons, (byte)x, (byte)y}), name);
+        check(Arrays.equals(queue.next(), new byte[]{(byte)buttons, (byte)x, (byte)y, 0}), name);
     }
     public static void main(String[] args) {
         MouseReports q = new MouseReports();
@@ -43,10 +43,35 @@ public final class MouseReportsTest {
         int count = 0;
         byte[] last = null, value;
         while ((value = q.next()) != null) { last = value; count++; }
-        check(count <= 30 && last != null && last[0] == 0, "overflow remains bounded and ends with release");
-        int size = 0, reportCount = 0, bits = 0, page = 0, collectionDepth = 0;
-        boolean mouse = false, relativeXY = false, reportId = false, keyboard = false;
-        byte[] d = MouseReports.DESCRIPTOR;
+        check(count <= 64 && last != null && last[0] == 0, "overflow remains bounded and ends with release");
+        q.button("left", true);
+        report(q, 1, 0, 0, "holding a pad presses the mouse button immediately");
+        q.move(30, -20);
+        report(q, 1, 30, -20, "movement retains the held button for dragging");
+        q.move(10, 15);
+        report(q, 1, 10, 15, "dragging stays held across multiple reports");
+        q.button("left", false);
+        report(q, 0, 0, 0, "lifting the finger releases a drag");
+        q.button("left", true); q.button("right", true);
+        report(q, 1, 0, 0, "left and right presses preserve transition order");
+        report(q, 3, 0, 0, "both pads can be held together");
+        q.button("left", false);
+        report(q, 2, 0, 0, "releasing left preserves held right");
+        q.button("right", false);
+        report(q, 0, 0, 0, "releasing right releases all buttons");
+        q.scroll(.4); check(q.next() == null, "small wheel movement accumulates");
+        q.scroll(1.8);
+        check(Arrays.equals(q.next(), new byte[]{0,0,0,2}), "scroll strip sends vertical wheel steps");
+        q.scroll(-2.4);
+        check(Arrays.equals(q.next(), new byte[]{0,0,0,-2}), "wheel reverses direction");
+        q.clearMotion(); q.button("left", true); q.scroll(2);
+        check(Arrays.equals(q.next(), new byte[]{1,0,0,2}), "scrolling preserves held buttons");
+        q.clear();
+        check(q.next() == null && Arrays.equals(q.current(), new byte[4]), "cancel clears movement, wheel and held buttons");
+        int size = 0, reportCount = 0, page = 0, collectionDepth = 0, id = 0;
+        int[] input = new int[4], output = new int[4];
+        boolean mouse = false, relativeXY = false, absoluteXY = false, keyboard = false;
+        byte[] d = HidDescriptor.BYTES;
         for (int i = 0; i < d.length;) {
             int prefix = d[i++] & 255;
             int length = prefix & 3;
@@ -57,14 +82,25 @@ public final class MouseReportsTest {
             if (prefix == 0x09 && page == 1 && data == 2) mouse = true;
             if (prefix == 0x75) size = data;
             if (prefix == 0x95) reportCount = data;
-            if (prefix == 0x85) reportId = true;
-            if (prefix == 0x81) { bits += size * reportCount; if (data == 6 && size == 8 && reportCount == 2) relativeXY = true; }
+            if (prefix == 0x85) id = data;
+            if (prefix == 0x81) {
+                input[id] += size * reportCount;
+                if (id == HidDescriptor.MOUSE && data == 6 && size == 8 && reportCount == 3) relativeXY = true;
+                if (id == HidDescriptor.CENTER && data == 2 && size == 16 && reportCount == 2) absoluteXY = true;
+            }
+            if (prefix == 0x91) output[id] += size * reportCount;
             if (prefix == 0xa1) collectionDepth++;
             if (prefix == 0xc0) collectionDepth--;
         }
-        check(mouse && !keyboard, "HID descriptor advertises only a mouse");
-        check(bits == 24 && !reportId && collectionDepth == 0, "descriptor matches three-byte boot-compatible reports");
-        check(relativeXY, "descriptor uses relative X/Y axes");
+        check(mouse && keyboard, "HID descriptor advertises mouse and keyboard");
+        check(input[1] == 32 && input[2] == 64 && input[3] == 32 && collectionDepth == 0,
+            "descriptor matches the three report formats and balances collections");
+        check(output[2] == 8, "keyboard descriptor accepts one-byte host LED state");
+        check(relativeXY && absoluteXY, "motion and recenter use independent relative and absolute axes");
+        byte[] center = HidDescriptor.CENTER_REPORT;
+        check(((center[0]&255) | ((center[1]&255)<<8)) == 16384 &&
+            ((center[2]&255) | ((center[3]&255)<<8)) == 16384,
+            "recenter targets the midpoint of both absolute axes");
         System.out.println(checks + " Bluetooth report checks passed.");
     }
 }
