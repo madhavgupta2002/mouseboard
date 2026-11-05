@@ -1,152 +1,115 @@
-# AirMouse
+# AirMouse — Bluetooth edition
 
-A working prototype that turns a Samsung Galaxy into a motion mouse for a Mac.
-Tilt the phone up/down and side to side, and tap the left/right pads to click.
-The apps communicate directly over your local network. There is no account,
-cloud service, or subscription.
+Your Galaxy S24 Ultra acts as a standard Bluetooth mouse. Tilt the phone to move
+the Mac pointer, and tap the left/right pads to click. All control traffic goes
+directly over Bluetooth; the Android app has no Internet permission.
 
-## Start here
+## Install and connect
 
-The built Mac app is **`dist/AirMouse.app`**. The phone installer is
-**`dist/AirMouse-Android.apk`**. Double-click **`Open AirMouse.command`** to open
-the Mac app, or open the app directly in Finder.
+1. Keep Bluetooth on. Your phone and Mac should already be paired in their system
+   Bluetooth settings.
+2. Open `dist/AirMouse.app` (or double-click `Open AirMouse.command`). The Mac app
+   is now a setup helper; it does not receive or inject mouse events.
+3. Select your phone and click **Send APK over Bluetooth**. Accept the incoming
+   file on the phone. If macOS asks whether AirMouse may control Bluetooth File
+   Exchange, allow it to start this transfer. Alternatively, use **Show APK in
+   Finder**, then send the file with macOS Bluetooth File Exchange yourself.
+4. On the phone, open the received `AirMouse-Android.apk` and install the update.
+   Allow installation from the source Android identifies when it asks. If Samsung
+   Auto Blocker prevents sideloading, use the phone's security settings to decide
+   whether to allow this locally built app; managed-device policy may prevent it.
+5. Open **AirMouse** on the phone, tap **Connect over Bluetooth**, and allow
+   **Nearby devices**. Choose your already-paired Mac from the list.
+6. Keep the phone app visible. Hold it screen-up near horizontal and tap
+   **Recenter**. Tilt its top edge up/down for vertical movement and tilt its
+   sides for horizontal movement. Tap **LEFT** or **RIGHT** to click.
 
-1. **Use the same Wi-Fi.** Connect the Mac and Galaxy S24 Ultra to the same
-   trusted private network. Keep AirMouse open on the Mac.
-2. **Allow the Mac to move the pointer.** Click **Open Settings** in AirMouse.
-   In **Privacy & Security → Accessibility**, enable **AirMouse**. If it is not
-   listed, use **+** to select the built app. The status in AirMouse changes
-   automatically. If macOS asks for **Local Network** access, allow it too.
-3. **Install the Android app.** Scan the QR code shown on the Mac using the
-   Samsung camera, or type the full displayed installation link in your phone's
-   browser. Tap **Download Android app**, open the APK, and approve installation
-   from your browser. This is a locally built development APK, not a Play Store
-   release. Only install it if you trust this project. You can revoke your
-   browser's “Install unknown apps” permission afterward.
-4. **Pair.** Return to the installation page in the phone browser. Tap
-   **Open AirMouse & fill pairing details**, then **Connect to Mac** in the app.
-   Alternatively, enter the Mac address and 12-character code manually.
-5. **Calibrate.** Hold the phone in portrait orientation, screen facing up near
-   horizontal, with its top pointing away from you. Tap **Recenter**.
-6. **Move and click.** Raise/lower the phone's top edge for vertical movement.
-   Tilt the right edge down to move right, and the left edge down to move left.
-   Tap **LEFT** or **RIGHT** to click. Two quick left taps send a double-click.
+You can quit the Mac setup helper after installation. macOS receives the phone
+as a real Bluetooth mouse, so this edition needs no Mac Accessibility permission,
+IP address, QR code, Wi-Fi, server, or company-network access. The phone's Pause
+button releases held mouse buttons and stops movement.
 
-Start with small movements. Change **Sensitivity** on the phone to taste.
-For remote-control-style pointing, turn on **Turn left/right instead of tilting**;
-horizontal movement then follows turning the phone left/right.
+## If the Mac does not accept the mouse connection
 
-The phone app must stay in the foreground. Switching apps, locking the phone,
-or a lost connection disconnects it. Tap **Connect to Mac** to reconnect.
-**Pause** works on either device. **⌘⇧P** pauses/resumes while the Mac app is
-focused. The Mac also has an AirMouse menu bar control.
+Ordinary phone pairing and the Bluetooth mouse profile are different things.
+If the phone app times out while connecting:
 
-## If something does not connect
+1. Keep AirMouse open on the phone so its mouse profile stays registered.
+2. Remove/forget the old phone pairing in Mac Bluetooth settings, then pair it
+   again while AirMouse is open. Return to the phone app and choose the Mac.
+3. Close other phone apps that act as Bluetooth keyboards/mice; Android allows
+   only one app to register the HID device profile at a time.
+4. Check AirMouse's **Nearby devices** permission and that Bluetooth is on.
+5. If the app reports that the HID device profile is unavailable, that phone's
+   firmware does not expose the required Android profile. Pairing alone cannot
+   add the profile.
 
-- **Samsung blocks the APK:** check **Settings → Security and privacy →
-  Auto Blocker**. If you choose to allow this local APK, temporarily turn off
-  Auto Blocker, install, then restore it. Managed devices may prohibit
-  sideloading; do not bypass organization policies.
-- **QR page will not load:** verify the same network, choose the correct address
-  in the Mac app if it lists several, and allow AirMouse through the macOS
-  firewall and Local Network settings. The whole link, including its random
-  path, is required. The QR updates automatically when the Mac's network address
-  changes; rescan the current QR instead of reopening a saved old link.
-- **IPv4 is unreachable:** choose an **IPv6** entry under Mac address and rescan
-  the updated QR. AirMouse supports both address families and prefers IPv6 when
-  the Mac has a usable global or local IPv6 address. This offers another direct
-  path on the same Wi-Fi; it does not override network isolation.
-- **Guest/office Wi-Fi or `ERR_ADDRESS_UNREACHABLE`:** the phone cannot reach
-  the Mac address. Even devices on the same Wi-Fi name can be separated by
-  network policy. Turn on the phone’s Mobile Hotspot, connect the Mac to it,
-  and scan the newly updated QR. This tests a direct path without changing
-  company firewall settings. If it still fails, compare the phone’s network
-  address and the address displayed by AirMouse before changing the app.
-- **Connected but no pointer movement:** enable AirMouse under Accessibility
-  and resume control on both devices. If you moved or rebuilt the Mac app,
-  remove the old Accessibility entry and add the current app again.
-- **Pairing fails:** enter the latest code shown on the Mac, or reopen the
-  latest QR page. A new code invalidates old installation links. After ten
-  unsuccessful handshakes, wait one minute.
-- **Movement is awkward:** return near horizontal and tap Recenter. Avoid
-  rotating past vertical in tilt mode. Try the alternate horizontal mode.
-- **Receiver cannot start:** another app or copy of AirMouse may be using TCP
-  ports **47821** or **47822**. Quit the extra copy.
+The controller deliberately disconnects when the phone app goes into the
+background or the phone locks. Reopen it and tap **Connect over Bluetooth**.
 
-## Why motion sensors instead of just the compass?
+## Implementation
 
-A compass alone measures heading; it does not provide smooth, full tilt
-tracking. AirMouse uses Android's **game rotation vector**, a fused relative
-orientation signal that avoids relying on the magnetic compass. It falls back
-to the standard rotation vector on phones without that sensor.
+- Android `BluetoothHidDevice` registers a mouse-only descriptor. It sends
+  three-byte reports: mouse buttons, relative X, and relative Y.
+- The descriptor uses no report ID and matches the three-byte boot mouse format.
+  It contains no keyboard usages. Both report and boot protocol modes use the
+  same bytes.
+- Left/right clicks have separate press and release reports. Large movements are
+  split into signed-byte deltas, fractional motion is retained, and pause/stop
+  releases buttons before disconnecting.
+- Android's game rotation vector supplies calibrated orientation. No magnetic
+  compass or camera is required. A standard rotation vector is the fallback.
+- The Mac helper uses IOBluetooth to display paired devices and Apple's Bluetooth
+  File Exchange to transfer the installer. It opens no network listener.
 
-Recenter sets a neutral orientation. The app measures changes relative to that
-orientation, applies a time-based smoothing filter, and sends pointer deltas at
-up to about 60 packets per second. A stationary phone stops the pointer.
-Click touches briefly suppress motion to reduce accidental jitter.
+## Build
 
-Reference: [Android position sensors](https://developer.android.com/develop/sensors-and-location/sensors/sensors_position).
-
-## Build from source
-
-Requires macOS 14 or later, Apple's Command Line Tools with Swift 5.9 or later,
-Java 17 or later, and Python 3.9 or later. Android Studio, Gradle, and paid Apple
-developer membership are not needed for this local build.
+Requires macOS 14+, Apple's Command Line Tools, Java 17+, and Python 3.9+.
+Android Studio, Gradle, an Apple developer account, and a Play Store account are
+not needed for this local prototype.
 
 ```sh
 bash scripts/build-all.sh
 open dist/AirMouse.app
 ```
 
-The build downloads two pinned official Google Android SDK archives into
-`.tools/android`, checks them against Google's published checksums, compiles
-the Java app, creates a local development signing key, and signs the APK.
-On an Apple Silicon Mac, Google's x86 SDK executables may require Rosetta.
+The Android build uses pinned official Google SDK components under `.tools` and
+signs with `.tools/airmouse-debug.keystore`. Keep that key to install future
+updates over the current app. The current APK is version **0.2.0**, version code
+**2**, and supports Android 9+ devices whose firmware enables HID device mode.
 The Mac app is locally ad-hoc signed.
 
-Keep `.tools/airmouse-debug.keystore` if you want future APKs to update an
-existing installation without uninstalling. This is a development key, not a
-release signing arrangement. The key and SDK are ignored by Git.
-
-The Mac build embeds the APK so the QR installation page works without running
-a separate server or installing any software on the Mac beyond AirMouse.
-
-```text
-mac/Sources/AirMouse/           SwiftUI app, TCP receiver, mouse events, install server
-mac/Sources/AirMouseCore/       Framing, validation, multi-display pointer bounds
-mac/Tests/AirMouseCoreChecks/   Standalone checks; full Xcode/XCTest not needed
-android/app/src/main/java/     Android UI, sensor math, TCP client
-scripts/                      Build and test commands
-dist/                         Ready-to-open app and ready-to-install APK
-```
-
 ## Verify
-
-Quit the Mac app before running integration tests:
 
 ```sh
 bash scripts/test.sh
 ```
 
-Tests cover protocol framing and bounds, calibrated motion directions,
-stationary behavior, pairing rejection, the single-phone limit, both clicks,
-heartbeat/disconnect handling, installation downloads, and protected links.
-Integration tests run the actual Mac receiver in diagnostic mode; they log
-events instead of moving your real pointer.
+The checks cover calibrated sensor motion, the real HID report descriptor,
+fractional/clamped movement, left/right and double-click ordering, queue limits,
+button release, APK permissions/version, and signatures. The APK must contain
+Bluetooth permissions only and no Internet permission.
 
-Testing on a physical S24 Ultra and approving macOS Accessibility remain
-manual steps. The build environment cannot provide the phone's sensor readings
-or grant these permissions for you.
+The Mac companion can also print its view of the system pairing:
 
-## MVP scope
+```sh
+dist/AirMouse.app/Contents/MacOS/AirMouse --diagnostics
+```
 
-- Mac receiver and Android controller; no Windows/Linux receiver yet.
-- Left/right click and double-click; scrolling and dragging are not implemented.
-- Local IPv4/IPv6 networking; no Bluetooth, USB, Internet relay, or automatic discovery.
-- One connected phone. A random pairing code authorizes input.
-- The installer is protected by a separate random link.
-- Traffic is **not encrypted**. Use a trusted private network; this prototype
-  does not protect against someone capturing traffic on that network.
-- Built APK targets Android API 35 and supports Android 8 or later.
-- The Mac build targets the architecture of the build machine.
-- Neither binary is a notarized/store-distributed release.
+A physical phone is still needed to verify registration, the Bluetooth HID link,
+and actual cursor movement. Automated packet checks do not prove that the phone
+has accepted or sent those packets over its Bluetooth radio.
+
+## Files
+
+- `android/app/src/main/java/dev/airmouse/` — phone UI, motion math, HID connection,
+  and mouse-report queue.
+- `mac/Sources/AirMouse/` — Bluetooth setup and installer transfer helper.
+- `scripts/` — local build and verification.
+- `dist/AirMouse-Android.apk` — install this on the phone.
+- `dist/AirMouse.app` — optional Mac setup helper.
+- `dist/AirMouse-WiFi-source-backup.tar.gz` — source snapshot of the previous
+  Wi-Fi edition, preserved before the Bluetooth conversion.
+
+Scrolling, dragging, background phone operation, and a store release are outside
+this MVP. The existing left/right pads provide clicks and double-clicks.

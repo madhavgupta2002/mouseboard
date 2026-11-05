@@ -1,7 +1,14 @@
 package dev.airmouse;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.Manifest;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothClass;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -12,26 +19,25 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
-import android.text.InputType;
+import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
-import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class MainActivity extends Activity implements SensorEventListener {
     private static final int BG = Color.rgb(12, 19, 28), CARD = Color.rgb(22, 33, 47);
@@ -41,19 +47,20 @@ public final class MainActivity extends Activity implements SensorEventListener 
     private Sensor rotation;
     private final MotionMath motion = new MotionMath();
     private final float[] quaternion = new float[4];
-    private PhoneConnection connection;
+    private HidMouseConnection connection;
+    private BluetoothAdapter adapter;
     private SharedPreferences preferences;
-    private EditText hostInput, codeInput;
     private TextView status, instructions, speedLabel, title, pairingHint, pairingHeading;
     private Button connectButton, pauseButton;
     private LinearLayout pairing;
     private AimView aim;
-    private boolean connected, connecting, paused, macEnabled, turnMode;
+    private boolean connected, connecting, paused, turnMode;
     private int fingersDown;
     private long freezeUntil, lastDraw;
     private double gain = 1550;
-    private int port = 47821;
-    private String stateText = "Ready to pair";
+    private String stateText = "Choose your paired Mac to begin";
+    private String selectedMac = "";
+    private static final int BLUETOOTH_PERMISSION = 10, ENABLE_BLUETOOTH = 11;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -62,19 +69,22 @@ public final class MainActivity extends Activity implements SensorEventListener 
         sensors = (SensorManager) getSystemService(SENSOR_SERVICE);
         rotation = sensors.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
         if (rotation == null) rotation = sensors.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
-        connection = new PhoneConnection((message, paired, enabled) -> {
+        BluetoothManager manager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
+        adapter = manager == null ? null : manager.getAdapter();
+        connection = new HidMouseConnection(this, adapter, (message, paired, busy) -> {
             connected = paired;
-            connecting = "Connecting…".equals(message);
-            macEnabled = enabled;
+            connecting = busy;
             stateText = message;
             if (!paired) { paused = false; fingersDown = 0; }
             recenter(false);
             refreshState();
         });
         buildUI();
-        applyLink(getIntent());
         if (rotation == null) {
             status.setText("No rotation sensor found on this phone.");
+            connectButton.setEnabled(false);
+        } else if (adapter == null) {
+            status.setText("Bluetooth is not available on this phone.");
             connectButton.setEnabled(false);
         }
     }
@@ -111,18 +121,16 @@ public final class MainActivity extends Activity implements SensorEventListener 
         pairing.setPadding(dp(18), dp(16), dp(18), dp(16));
         pairing.setBackground(background(CARD, 20));
         add(root, pairing, 22);
-        pairingHeading = label("PAIR WITH YOUR MAC", 11, MINT);
+        pairingHeading = label("BLUETOOTH MOUSE", 11, MINT);
         add(pairing, pairingHeading, 0);
-        hostInput = field("Mac IPv4 or IPv6 address", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        hostInput.setText(preferences.getString("host", ""));
-        add(pairing, hostInput, 12);
-        codeInput = field("12-character pairing code", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        add(pairing, codeInput, 8);
-        connectButton = button("Connect to Mac", true);
+        connectButton = button("Connect over Bluetooth", true);
         connectButton.setOnClickListener(view -> connectOrDisconnect());
         add(pairing, connectButton, 14);
-        pairingHint = label("Use the same Wi-Fi. Get the address and code\nfrom the AirMouse app on your Mac.", 12, MUTED);
+        pairingHint = label("Select your already-paired Mac. AirMouse acts\nas a standard Bluetooth mouse. No Wi-Fi needed.", 12, MUTED);
         add(pairing, pairingHint, 10);
+        Button settings = button("Bluetooth settings", false);
+        settings.setOnClickListener(view -> startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
+        add(pairing, settings, 12);
 
         aim = new AimView();
         LinearLayout.LayoutParams aimLayout = new LinearLayout.LayoutParams(-1, dp(112));
@@ -185,7 +193,7 @@ public final class MainActivity extends Activity implements SensorEventListener 
         add(root, mode, 4);
         instructions.setText(turnMode ? "Hold screen-up. Tilt up/down.\nTurn left/right like a remote." :
             "Hold screen-up near horizontal.\nTilt up/down and side to side.");
-        add(root, label("LOCAL WI-FI  ·  NO ACCOUNT  ·  KEEP APP OPEN", 9, MUTED), 24);
+        add(root, label("BLUETOOTH ONLY  ·  NO ACCOUNT  ·  KEEP APP OPEN", 9, MUTED), 24);
         refreshState();
     }
 
@@ -196,37 +204,57 @@ public final class MainActivity extends Activity implements SensorEventListener 
             stateText = "Disconnected"; refreshState();
             return;
         }
-        if (rotation == null) return;
-        String host = NetworkAddress.normalize(hostInput.getText().toString());
-        String code = codeInput.getText().toString().replaceAll("[\\s-]", "").toUpperCase(Locale.US);
-        if (!NetworkAddress.valid(host)) {
-            hostInput.setError("Enter the Mac’s IPv4 or IPv6 address shown in AirMouse"); return;
+        if (rotation == null || adapter == null) return;
+        if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, BLUETOOTH_PERMISSION);
+            return;
         }
-        if (!code.matches("[0-9A-F]{12}")) { codeInput.setError("Enter the 12-character code shown on Mac"); return; }
-        preferences.edit().putString("host", host).apply();
-        InputMethodManager keyboard = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        keyboard.hideSoftInputFromWindow(codeInput.getWindowToken(), 0);
-        hostInput.clearFocus(); codeInput.clearFocus();
+        if (!adapter.isEnabled()) {
+            startActivityForResult(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), ENABLE_BLUETOOTH);
+            return;
+        }
+        final List<BluetoothDevice> devices = new ArrayList<>(adapter.getBondedDevices());
+        devices.sort((a, b) -> {
+            boolean computerA = isComputer(a), computerB = isComputer(b);
+            if (computerA != computerB) return computerA ? -1 : 1;
+            return HidMouseConnection.deviceName(a).compareToIgnoreCase(HidMouseConnection.deviceName(b));
+        });
+        if (devices.isEmpty()) {
+            new AlertDialog.Builder(this).setTitle("Pair your Mac first")
+                .setMessage("Pair this phone with your Mac in Bluetooth settings, then return here and tap Connect.")
+                .setPositiveButton("Bluetooth settings", (dialog, which) -> startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)))
+                .setNegativeButton("Cancel", null).show();
+            return;
+        }
+        String[] names = new String[devices.size()];
+        for (int i = 0; i < devices.size(); i++) names[i] = HidMouseConnection.deviceName(devices.get(i));
+        new AlertDialog.Builder(this).setTitle("Choose your paired Mac")
+            .setItems(names, (dialog, which) -> connectTo(devices.get(which)))
+            .setNegativeButton("Cancel", null).show();
+    }
+
+    private boolean isComputer(BluetoothDevice device) {
+        BluetoothClass kind = device.getBluetoothClass();
+        return kind != null && kind.getMajorDeviceClass() == BluetoothClass.Device.Major.COMPUTER;
+    }
+
+    private void connectTo(BluetoothDevice device) {
+        selectedMac = HidMouseConnection.deviceName(device);
         connection.setActive(true);
         connecting = true;
-        connection.start(host, port, code);
-        stateText = "Connecting…";
+        connection.start(device);
+        stateText = "Starting Bluetooth mouse…";
         refreshState();
     }
 
     private void refreshState() {
         status.setText(paused && connected ? "Paused · tap Resume when ready" : stateText);
-        status.setTextColor(connected && macEnabled && !paused ? MINT : MUTED);
-        hostInput.setEnabled(!connected && !connecting);
-        codeInput.setEnabled(!connected && !connecting);
-        connectButton.setText(connected ? "Disconnect" : connecting ? "Cancel" : "Connect to Mac");
+        status.setTextColor(connected && !paused ? MINT : MUTED);
+        connectButton.setText(connected ? "Disconnect" : connecting ? "Cancel" : "Connect over Bluetooth");
         pauseButton.setText(paused ? "▶  Resume" : "Ⅱ  Pause");
         pauseButton.setEnabled(connected);
-        // Collapse fields after pairing, leaving a clear disconnect button.
-        hostInput.setVisibility(connected ? View.GONE : View.VISIBLE);
-        codeInput.setVisibility(connected ? View.GONE : View.VISIBLE);
         pairingHint.setVisibility(connected ? View.GONE : View.VISIBLE);
-        pairingHeading.setText(connected ? "CONNECTED TO " + hostInput.getText() : "PAIR WITH YOUR MAC");
+        pairingHeading.setText(connected ? "CONNECTED TO " + selectedMac : "BLUETOOTH MOUSE");
         title.setText(connected ? "You're in control." : "A little tilt.\nA lot of control.");
         title.setTextSize(connected ? 28 : 35);
         aim.getLayoutParams().height = dp(connected ? 80 : 112);
@@ -284,7 +312,7 @@ public final class MainActivity extends Activity implements SensorEventListener 
     }
 
     @Override public void onSensorChanged(SensorEvent event) {
-        if (!connected || paused || !macEnabled) return;
+        if (!connected || paused) return;
         SensorManager.getQuaternionFromVector(quaternion, event.values);
         if (fingersDown > 0 || SystemClock.elapsedRealtime() < freezeUntil) { motion.reset(); return; }
         double[] delta = motion.update(quaternion, event.timestamp / 1e9, turnMode, gain);
@@ -309,22 +337,21 @@ public final class MainActivity extends Activity implements SensorEventListener 
         stateText = "Disconnected while app was in background";
         refreshState();
     }
-    @Override protected void onDestroy() { connection.stop(); super.onDestroy(); }
-    @Override protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent); setIntent(intent); applyLink(intent);
+    @Override protected void onDestroy() { connection.destroy(); super.onDestroy(); }
+
+    @Override public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(request, permissions, results);
+        if (request != BLUETOOTH_PERMISSION) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) connectOrDisconnect();
+        else {
+            stateText = "Allow Nearby devices in AirMouse app permissions to connect.";
+            refreshState();
+        }
     }
 
-    private void applyLink(Intent intent) {
-        Uri uri = intent.getData();
-        if (uri == null || !"airmouse".equals(uri.getScheme()) || !"connect".equals(uri.getHost())) return;
-        // A link only fills fields; explicit Connect is always required.
-        connection.stop(); connected = false; connecting = false; paused = false;
-        String host = uri.getQueryParameter("host"), code = uri.getQueryParameter("code");
-        if (host != null) hostInput.setText(host);
-        if (code != null) codeInput.setText(code);
-        port = 47821;
-        stateText = "Pairing details filled · tap Connect";
-        refreshState();
+    @Override protected void onActivityResult(int request, int result, Intent data) {
+        super.onActivityResult(request, result, data);
+        if (request == ENABLE_BLUETOOTH && result == RESULT_OK) connectOrDisconnect();
     }
 
     private TextView label(String text, int size, int color) {
@@ -332,14 +359,6 @@ public final class MainActivity extends Activity implements SensorEventListener 
         view.setText(text); view.setTextSize(size); view.setTextColor(color);
         view.setFontFeatureSettings("kern");
         return view;
-    }
-    private EditText field(String hint, int type) {
-        EditText input = new EditText(this);
-        input.setHint(hint); input.setTextColor(TEXT); input.setHintTextColor(MUTED);
-        input.setTextSize(14); input.setSingleLine(true); input.setInputType(type);
-        input.setPadding(dp(8), dp(8), dp(8), dp(8));
-        input.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
-        return input;
     }
     private Button button(String title, boolean primary) {
         Button button = new Button(this);
@@ -371,7 +390,7 @@ public final class MainActivity extends Activity implements SensorEventListener 
             canvas.drawLine(cx-dp(53), cy, cx+dp(53), cy, paint);
             canvas.drawLine(cx, cy-dp(49), cx, cy+dp(49), paint);
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(connected && macEnabled && !paused ? MINT : MUTED);
+            paint.setColor(connected && !paused ? MINT : MUTED);
             canvas.drawCircle(cx + Math.max(-dp(33), Math.min(dp(33), dx*2)),
                 cy + Math.max(-dp(33), Math.min(dp(33), dy*2)), dp(6), paint);
         }

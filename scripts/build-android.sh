@@ -12,7 +12,7 @@ mkdir -p "$BUILD/classes" "$BUILD/dex"
 "$TOOLS/aapt2" compile --dir "$ROOT/android/app/src/main/res" -o "$BUILD/resources.zip"
 "$TOOLS/aapt2" link -o "$BUILD/base.apk" -I "$JAR" \
   --manifest "$ROOT/android/app/src/main/AndroidManifest.xml" \
-  --java "$BUILD/generated" --min-sdk-version 26 --target-sdk-version 35 \
+  --java "$BUILD/generated" --min-sdk-version 28 --target-sdk-version 35 \
   "$BUILD/resources.zip"
 python3 - "$ROOT" "$BUILD" <<'PY'
 import json, pathlib, sys
@@ -23,7 +23,7 @@ sources += sorted((build / "generated").rglob("*.java"))
 PY
 javac --release 8 -classpath "$JAR" -d "$BUILD/classes" @"$BUILD/sources.txt"
 jar cf "$BUILD/classes.jar" -C "$BUILD/classes" .
-"$TOOLS/d8" --lib "$JAR" --min-api 26 --output "$BUILD/dex" "$BUILD/classes.jar"
+"$TOOLS/d8" --lib "$JAR" --min-api 28 --output "$BUILD/dex" "$BUILD/classes.jar"
 cp "$BUILD/base.apk" "$BUILD/unsigned.apk"
 (cd "$BUILD/dex" && zip -q -u "$BUILD/unsigned.apk" classes.dex)
 "$TOOLS/zipalign" -f -p 4 "$BUILD/unsigned.apk" "$BUILD/aligned.apk"

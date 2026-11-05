@@ -6,11 +6,8 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [.executable(name: "AirMouse", targets: ["AirMouse"])],
     targets: [
-        .target(name: "AirMouseCore"),
-        .executableTarget(name: "AirMouse", dependencies: ["AirMouseCore"],
+        .executableTarget(name: "AirMouse",
                           linkerSettings: [.linkedFramework("AppKit"),
-                                           .linkedFramework("ApplicationServices")]),
-        .executableTarget(name: "AirMouseCoreChecks", dependencies: ["AirMouseCore"],
-                          path: "Tests/AirMouseCoreChecks")
+                                           .linkedFramework("IOBluetooth")])
     ]
 )
