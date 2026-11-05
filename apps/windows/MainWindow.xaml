@@ -1,0 +1,99 @@
+<Window x:Class="MouseBoard.Windows.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MouseBoard" Icon="Assets/MouseBoard.ico" Width="880" Height="720" MinWidth="740" MinHeight="620"
+        Background="Black" Foreground="#F4F4F4" FontFamily="Segoe UI"
+        WindowStartupLocation="CenterScreen">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <Grid Margin="34,28">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <Grid>
+        <TextBlock Text="M O U S E B O A R D" FontSize="12" FontWeight="SemiBold" />
+        <TextBlock Text="WINDOWS · BLUETOOTH" HorizontalAlignment="Right"
+                   FontSize="11" Foreground="{StaticResource MutedBrush}" />
+      </Grid>
+      <StackPanel Grid.Row="1" Margin="0,28,0,28">
+        <TextBlock Text="MouseBoard." FontSize="42" FontWeight="SemiBold" />
+        <TextBlock Text="Your phone is the mouse, scroll wheel and keyboard."
+                   Margin="0,10,0,0" FontSize="15" Foreground="{StaticResource MutedBrush}" />
+      </StackPanel>
+      <Border Grid.Row="2" Background="{StaticResource PanelBrush}" CornerRadius="16"
+              BorderBrush="#222222" BorderThickness="1" Padding="24">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="36" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+            <TextBlock Text="01   INSTALL ON YOUR PHONE" FontSize="11"
+                       Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold" />
+            <Grid Margin="0,18,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <ComboBox x:Name="Devices" DisplayMemberPath="DisplayName" MinHeight="36"
+                        AutomationProperties.Name="Paired Bluetooth devices"
+                        VerticalContentAlignment="Center" />
+              <Button x:Name="RefreshButton" Grid.Column="1" Content="↻" FontSize="18"
+                      Padding="10,4" Margin="6,0,0,0" Click="RefreshClicked"
+                      AutomationProperties.Name="Refresh paired devices" />
+            </Grid>
+            <TextBlock x:Name="DeviceStatus" Text="Reading paired Bluetooth devices…"
+                       Margin="0,10,0,14" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+            <Button x:Name="SendButton" Content="Open Bluetooth sender" Click="SendClicked"
+                    Background="#F4F4F4" Foreground="Black" HorizontalAlignment="Left" />
+            <TextBlock Text="Choose your phone in Windows File Transfer, then select this APK:"
+                       Margin="0,14,0,8" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+            <TextBox x:Name="InstallerPathBox" IsReadOnly="True" TextWrapping="Wrap"
+                     Background="Transparent" Foreground="#D0D0D0" BorderThickness="0"
+                     FontFamily="Consolas" FontSize="11"
+                     AutomationProperties.Name="Android installer path" />
+            <WrapPanel Margin="0,12,0,0">
+              <Button x:Name="ShowButton" Content="Show APK" Click="ShowClicked"
+                      Padding="10,7" Margin="0,0,6,6" />
+              <Button x:Name="CopyButton" Content="Copy path" Click="CopyClicked"
+                      Padding="10,7" Margin="0,0,6,6" />
+              <Button Content="Bluetooth settings" Click="SettingsClicked"
+                      Padding="10,7" Margin="0,0,0,6" />
+            </WrapPanel>
+          </StackPanel>
+          <Border Grid.Column="1" Width="1" Background="#292929" />
+          <StackPanel Grid.Column="2">
+            <TextBlock Text="02   CONNECT &amp; CONTROL" FontSize="11"
+                       Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold" />
+            <TextBlock Text="Pair with this PC" Margin="0,18,0,5"
+                       FontSize="15" FontWeight="SemiBold" />
+            <TextBlock x:Name="PcNameText" FontSize="13"
+                       Foreground="{StaticResource MutedBrush}" />
+            <TextBlock Text="Open MouseBoard on your phone, allow Nearby devices, tap Connect and select this PC."
+                       Margin="0,12,0,0" FontSize="13" Foreground="{StaticResource MutedBrush}" />
+            <TextBlock Text="Recenter. Then tilt." Margin="0,20,0,5"
+                       FontSize="15" FontWeight="SemiBold" />
+            <TextBlock Text="Hold LEFT and tilt to drag. Swipe the middle strip to scroll. Tap Keyboard to type."
+                       FontSize="13" Foreground="{StaticResource MutedBrush}" />
+            <TextBlock Text="Keep the phone app open." Margin="0,20,0,5"
+                       FontSize="15" FontWeight="SemiBold" />
+            <TextBlock Text="Use the US keyboard layout on Windows. If you upgraded from the old mouse-only version, remove the old pairing and pair again."
+                       FontSize="12" Foreground="{StaticResource MutedBrush}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+      <Border Grid.Row="3" Background="#0A0A0A" CornerRadius="10" Padding="16,12" Margin="0,18,0,0">
+        <TextBlock x:Name="ActionStatus"
+                   Text="Windows receives standard Bluetooth input directly. You can close this helper after installation."
+                   FontSize="12" Foreground="{StaticResource MutedBrush}"
+                   AutomationProperties.LiveSetting="Polite" />
+      </Border>
+      <TextBlock Grid.Row="4" Text="BLUETOOTH ONLY · NO NETWORK SERVER · NO ACCOUNT"
+                 FontSize="10" Foreground="#777777" Margin="0,20,0,0" />
+    </Grid>
+  </ScrollViewer>
+</Window>

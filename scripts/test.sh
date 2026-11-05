@@ -1,15 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-mkdir -p "$ROOT/android/build/tests"
-javac --release 8 -d "$ROOT/android/build/tests" \
-  "$ROOT/android/app/src/main/java/dev/airmouse/MotionMath.java" "$ROOT/android/MotionMathTest.java" \
-  "$ROOT/android/app/src/main/java/dev/airmouse/MouseReports.java" "$ROOT/android/MouseReportsTest.java" \
-  "$ROOT/android/app/src/main/java/dev/airmouse/HidDescriptor.java" \
-  "$ROOT/android/app/src/main/java/dev/airmouse/KeyboardReports.java" "$ROOT/android/KeyboardReportsTest.java" \
-  "$ROOT/android/app/src/main/java/dev/airmouse/TextEdit.java" "$ROOT/android/MotionStabilityTest.java"
-java -cp "$ROOT/android/build/tests" dev.airmouse.MotionMathTest
-java -cp "$ROOT/android/build/tests" dev.airmouse.MotionStabilityTest
-java -cp "$ROOT/android/build/tests" dev.airmouse.MouseReportsTest
-java -cp "$ROOT/android/build/tests" dev.airmouse.KeyboardReportsTest
-python3 "$ROOT/scripts/verify-bluetooth.py"
+MODE="${1:-all}"
+if [[ "$MODE" != "all" && "$MODE" != "--unit-only" ]]; then
+  echo "Usage: bash scripts/test.sh [--unit-only]" >&2
+  exit 2
+fi
+mkdir -p "$ROOT/apps/android/build/tests"
+javac --release 8 -d "$ROOT/apps/android/build/tests" \
+  "$ROOT/apps/android/app/src/main/java/dev/airmouse/MotionMath.java" "$ROOT/tests/android/MotionMathTest.java" \
+  "$ROOT/apps/android/app/src/main/java/dev/airmouse/MouseReports.java" "$ROOT/tests/android/MouseReportsTest.java" \
+  "$ROOT/apps/android/app/src/main/java/dev/airmouse/HidDescriptor.java" \
+  "$ROOT/apps/android/app/src/main/java/dev/airmouse/KeyboardReports.java" "$ROOT/tests/android/KeyboardReportsTest.java" \
+  "$ROOT/apps/android/app/src/main/java/dev/airmouse/TextEdit.java" "$ROOT/tests/android/MotionStabilityTest.java"
+java -cp "$ROOT/apps/android/build/tests" dev.airmouse.MotionMathTest
+java -cp "$ROOT/apps/android/build/tests" dev.airmouse.MotionStabilityTest
+java -cp "$ROOT/apps/android/build/tests" dev.airmouse.MouseReportsTest
+java -cp "$ROOT/apps/android/build/tests" dev.airmouse.KeyboardReportsTest
+if [[ "$MODE" != "--unit-only" ]]; then
+  python3 "$ROOT/scripts/verify-bluetooth.py"
+fi

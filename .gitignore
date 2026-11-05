@@ -1,6 +1,14 @@
 .tools/
-mac/.build/
-android/build/
+**/.build/
+**/build/
+**/bin/
+**/obj/
 dist/
 .DS_Store
 *.keystore
+*.jks
+*.p12
+*.pfx
+.env
+.env.*
+!.env.example

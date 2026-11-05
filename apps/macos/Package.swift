@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "AirMouse",
+    name: "MouseBoard",
     platforms: [.macOS(.v14)],
-    products: [.executable(name: "AirMouse", targets: ["AirMouse"])],
+    products: [.executable(name: "MouseBoard", targets: ["MouseBoard"])],
     targets: [
-        .executableTarget(name: "AirMouse",
+        .executableTarget(name: "MouseBoard",
                           linkerSettings: [.linkedFramework("AppKit"),
                                            .linkedFramework("IOBluetooth")])
     ]

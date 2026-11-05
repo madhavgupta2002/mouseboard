@@ -17,7 +17,7 @@ final class BluetoothSetup: ObservableObject {
     private var timer: Timer?
 
     var selectedPhone: PairedPhone? { devices.first { $0.id == selectedAddress } }
-    var apkURL: URL? { Bundle.main.url(forResource: "AirMouse-Android", withExtension: "apk") }
+    var apkURL: URL? { Bundle.main.url(forResource: "MouseBoard-Android", withExtension: "apk") }
 
     func start() {
         refresh()

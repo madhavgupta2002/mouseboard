@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct AirMouseApp: App {
+struct MouseBoardApp: App {
     @StateObject private var setup = BluetoothSetup()
 
     var body: some Scene {
@@ -23,10 +23,10 @@ struct AirMouseApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 800, height: 650)
         .windowResizability(.contentSize)
-        MenuBarExtra("AirMouse Bluetooth", systemImage: "cursorarrow.motionlines") {
+        MenuBarExtra("MouseBoard Bluetooth", systemImage: "cursorarrow.motionlines") {
             Text("Bluetooth mouse setup")
             Button("Bluetooth settings") { setup.openSettings() }
-            Button("Show AirMouse") {
+            Button("Show MouseBoard") {
                 NSApp.activate(ignoringOtherApps: true)
                 NSApp.windows.first(where: { $0.canBecomeMain })?.makeKeyAndOrderFront(nil)
             }
@@ -56,7 +56,7 @@ private struct BluetoothSetupView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 25) {
             HStack {
-                Label("AIR MOUSE", systemImage: "cursorarrow.motionlines")
+                Label("MOUSEBOARD", systemImage: "cursorarrow.motionlines")
                     .font(.system(size: 13, weight: .bold, design: .rounded)).tracking(2).foregroundColor(mint)
                 Spacer()
                 Circle().fill(setup.bluetoothOn ? mint : Color.orange).frame(width: 7, height: 7)
@@ -65,7 +65,7 @@ private struct BluetoothSetupView: View {
             }
             HStack {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("AirMouse.").font(.system(size: 47, weight: .semibold, design: .rounded)).tracking(-2)
+                    Text("MouseBoard.").font(.system(size: 47, weight: .semibold, design: .rounded)).tracking(-2)
                     Text("Mouse, scroll and keyboard. Over Bluetooth.")
                         .font(.system(size: 14)).foregroundColor(subtle)
                 }
@@ -78,7 +78,7 @@ private struct BluetoothSetupView: View {
                 VStack(alignment: .leading, spacing: 15) {
                     section("01", "INSTALL ON YOUR GALAXY")
                     if setup.devices.isEmpty {
-                        Text("Pair your phone in Mac Bluetooth settings. Allow Bluetooth access for AirMouse if macOS asks.")
+                        Text("Pair your phone in Mac Bluetooth settings. Allow Bluetooth access for MouseBoard if macOS asks.")
                             .font(.system(size: 13)).foregroundColor(subtle)
                     } else {
                         Picker("Paired phone", selection: $setup.selectedAddress) {
@@ -108,7 +108,7 @@ private struct BluetoothSetupView: View {
                 Rectangle().fill(Color.white.opacity(0.1)).frame(width: 1)
                 VStack(alignment: .leading, spacing: 17) {
                     section("02", "CONNECT & POINT")
-                    instruction("1", "Open AirMouse on your phone.",
+                    instruction("1", "Open MouseBoard on your phone.",
                                 "Allow Nearby devices when asked.")
                     instruction("2", "Tap Connect.",
                                 "Choose \(setup.macName) from the paired-device list.")
@@ -130,7 +130,7 @@ private struct BluetoothSetupView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Text("BLUETOOTH ONLY  ·  v0.3.0")
+            Text("BLUETOOTH ONLY  ·  v0.4.0")
                 .font(.system(size: 9, weight: .medium)).tracking(1).foregroundColor(subtle)
         }
         .buttonStyle(.bordered)

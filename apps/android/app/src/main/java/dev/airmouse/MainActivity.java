@@ -70,7 +70,13 @@ public final class MainActivity extends Activity implements SensorEventListener 
         getWindow().setNavigationBarColor(BLACK);
         preferences = getSharedPreferences("airmouse", MODE_PRIVATE);
         gain = 1550*(.5 + preferences.getInt("speed", 50)/100.0);
-        turnMode = preferences.getBoolean("turnMode", false);
+        // The user-confirmed working mapping becomes the default for new and
+        // existing installations once. Later explicit changes remain saved.
+        if (preferences.getInt("motionModeDefaultsVersion", 0) < 1) {
+            preferences.edit().putBoolean("turnMode", true)
+                .putInt("motionModeDefaultsVersion", 1).apply();
+        }
+        turnMode = preferences.getBoolean("turnMode", true);
         sensors = (SensorManager)getSystemService(SENSOR_SERVICE);
         rotation = sensors.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
         if (rotation == null) rotation = sensors.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
@@ -98,7 +104,7 @@ public final class MainActivity extends Activity implements SensorEventListener 
 
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView brand = label("AIR MOUSE", 12, TEXT);
+        TextView brand = label("MOUSEBOARD", 12, TEXT);
         brand.setLetterSpacing(.18f);
         brand.setTypeface(null, Typeface.BOLD);
         header.addView(brand, new LinearLayout.LayoutParams(0, dp(40), 1));
@@ -232,7 +238,7 @@ public final class MainActivity extends Activity implements SensorEventListener 
     }
 
     private void showKeyboard() {
-        if (!connected || paused) { toast("Connect and resume AirMouse first"); return; }
+        if (!connected || paused) { toast("Connect and resume MouseBoard first"); return; }
         editor.requestFocus();
         editor.post(() -> ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE))
             .showSoftInput(editor, InputMethodManager.SHOW_IMPLICIT));
@@ -339,7 +345,7 @@ public final class MainActivity extends Activity implements SensorEventListener 
             : HidMouseConnection.deviceName(a).compareToIgnoreCase(HidMouseConnection.deviceName(b)));
         if (devices.isEmpty()) {
             new AlertDialog.Builder(this).setTitle("Pair your Mac")
-                .setMessage("Pair in Bluetooth settings, then return to AirMouse.")
+                .setMessage("Pair in Bluetooth settings, then return to MouseBoard.")
                 .setPositiveButton("Bluetooth settings", (d,w) -> openBluetooth())
                 .setNegativeButton("Cancel", null).show(); return;
         }
@@ -389,7 +395,7 @@ public final class MainActivity extends Activity implements SensorEventListener 
         });
         panel.addView(speed);
         Switch mode = new Switch(this);
-        mode.setText("Turn left/right instead of tilting");
+        mode.setText("Turn left/right (default)");
         mode.setTextSize(13); mode.setTextColor(TEXT); mode.setChecked(turnMode);
         mode.setOnCheckedChangeListener((v,checked) -> {
             turnMode = checked; preferences.edit().putBoolean("turnMode", checked).apply(); resetMotion();
@@ -397,8 +403,8 @@ public final class MainActivity extends Activity implements SensorEventListener 
         panel.addView(mode);
         TextView note = label("Typing: set your Mac input source to ABC / US.\n"+
             "English text and punctuation; no emoji yet.\n\n"+
-            "If the updated controls do not work, forget the phone on the Mac, "+
-            "then pair again with AirMouse open.\n\nBluetooth only · v0.3.0", 12, MUTED);
+            "If the updated controls do not work, forget the phone on the computer, "+
+            "then pair again with MouseBoard open.\n\nBluetooth only · v0.4.0", 12, MUTED);
         note.setPadding(0, dp(20), 0, 0);
         panel.addView(note);
         new AlertDialog.Builder(this).setTitle("Settings").setView(panel)

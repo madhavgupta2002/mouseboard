@@ -69,7 +69,7 @@ final class HidMouseConnection {
                 }
             }, 20000);
         } catch (SecurityException denied) {
-            fail(id, "Allow Nearby devices permission for AirMouse.");
+            fail(id, "Allow Nearby devices permission for MouseBoard.");
         }
     }
 
@@ -77,7 +77,7 @@ final class HidMouseConnection {
         BluetoothHidDevice service = hid;
         if (service == null || id != generation) return;
         BluetoothHidDeviceAppSdpSettings settings = new BluetoothHidDeviceAppSdpSettings(
-            "AirMouse", "Motion mouse and keyboard", "AirMouse",
+            "MouseBoard", "Motion mouse and keyboard", "MouseBoard",
             BluetoothHidDevice.SUBCLASS1_COMBO, HidDescriptor.BYTES.clone());
         try {
             boolean accepted = service.registerApp(settings, null, null, main::post, new BluetoothHidDevice.Callback() {
@@ -95,9 +95,9 @@ final class HidMouseConnection {
                         if (state == BluetoothProfile.STATE_CONNECTED) {
                             becameConnected(id, device);
                         } else if (state != BluetoothProfile.STATE_CONNECTING && !proxy.connect(device)) {
-                            fail(id, "Mac refused the mouse connection. Keep AirMouse open and pair the phone again in Mac Bluetooth settings.");
+                            fail(id, "Mac refused the mouse connection. Keep MouseBoard open and pair the phone again in Mac Bluetooth settings.");
                         }
-                    } catch (SecurityException denied) { fail(id, "Allow Nearby devices permission for AirMouse."); }
+                    } catch (SecurityException denied) { fail(id, "Allow Nearby devices permission for MouseBoard."); }
                 }
                 @Override public void onConnectionStateChanged(BluetoothDevice device, int state) {
                     if (id != generation || !isTarget(device)) return;
@@ -147,7 +147,7 @@ final class HidMouseConnection {
                 }
             });
             if (!accepted) fail(id, "Could not register a Bluetooth mouse. Close other phone keyboard/mouse apps and retry.");
-        } catch (SecurityException denied) { fail(id, "Allow Nearby devices permission for AirMouse."); }
+        } catch (SecurityException denied) { fail(id, "Allow Nearby devices permission for MouseBoard."); }
     }
 
     private void becameConnected(long id, BluetoothDevice device) {
