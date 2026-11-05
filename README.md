@@ -29,6 +29,15 @@ as a real Bluetooth mouse, so this edition needs no Mac Accessibility permission
 IP address, QR code, Wi-Fi, server, or company-network access. The phone's Pause
 button releases held mouse buttons and stops movement.
 
+## Motion stability update (0.2.1)
+
+Install the new APK over the existing app, reconnect, and tap **Recenter**.
+Each axis now uses speed-adaptive smoothing: stronger filtering near rest,
+with faster response during deliberate movement. A small angular hysteresis
+suppresses tiny reversals without discarding accumulated slow movement.
+Sensor discontinuities reset the filters so they cannot cause delayed jumps.
+The Bluetooth pairing and controls are unchanged.
+
 ## If the Mac does not accept the mouse connection
 
 Ordinary phone pairing and the Bluetooth mouse profile are different things.
@@ -59,6 +68,10 @@ background or the phone locks. Reopen it and tap **Connect over Bluetooth**.
   releases buttons before disconnecting.
 - Android's game rotation vector supplies calibrated orientation. No magnetic
   compass or camera is required. A standard rotation vector is the fallback.
+- Independent per-axis adaptive filters and a 0.037-degree hysteresis reduce
+  jitter. Cutoff is 1.5 Hz at rest and rises with filtered angular speed.
+  This follows the speed-adaptive filtering approach of Casiez, Roussel, and
+  Vogel, *1 € Filter* (CHI 2012), with angular wrapping and position hysteresis.
 - The Mac helper uses IOBluetooth to display paired devices and Apple's Bluetooth
   File Exchange to transfer the installer. It opens no network listener.
 
@@ -75,8 +88,8 @@ open dist/AirMouse.app
 
 The Android build uses pinned official Google SDK components under `.tools` and
 signs with `.tools/airmouse-debug.keystore`. Keep that key to install future
-updates over the current app. The current APK is version **0.2.0**, version code
-**2**, and supports Android 9+ devices whose firmware enables HID device mode.
+updates over the current app. The current APK is version **0.2.1**, version code
+**3**, and supports Android 9+ devices whose firmware enables HID device mode.
 The Mac app is locally ad-hoc signed.
 
 ## Verify
@@ -85,7 +98,9 @@ The Mac app is locally ad-hoc signed.
 bash scripts/test.sh
 ```
 
-The checks cover calibrated sensor motion, the real HID report descriptor,
+The checks cover calibrated sensor motion, simulated stationary noise,
+slow aiming, fast sweeps, sample-rate consistency, recentering and sensor
+discontinuities, the real HID report descriptor,
 fractional/clamped movement, left/right and double-click ordering, queue limits,
 button release, APK permissions/version, and signatures. The APK must contain
 Bluetooth permissions only and no Internet permission.
