@@ -175,6 +175,12 @@ public final class MouseBoardService extends Service implements SensorEventListe
     KeyboardReports.Result navigate(boolean forward) {
         return connection.navigate(forward, preferences.getBoolean("macShortcuts", true));
     }
+    KeyboardReports.Result zoom(int steps) {
+        return connection.zoom(steps, preferences.getBoolean("macShortcuts", true));
+    }
+    KeyboardReports.Result workspace(boolean horizontal, int direction) {
+        return connection.workspace(horizontal, direction, preferences.getBoolean("macShortcuts", true));
+    }
     @Override public void onSensorChanged(SensorEvent event) {
         if (!connected || paused || touchpad) return;
         if (touchBusy || SystemClock.elapsedRealtime() < freezeUntil) { motion.reset(); return; }

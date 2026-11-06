@@ -18,6 +18,11 @@ final class TouchpadView extends View {
     private final float density;
     private boolean dim, dimButtons;
     private final Runnable hold = this::hold;
+    private final Runnable momentum = this::momentum;
+    private void momentum() {
+        if (isEnabled() && gestures.animate(android.os.SystemClock.uptimeMillis()))
+            postOnAnimation(momentum);
+    }
     private void hold() {
         if (gestures.hold(android.os.SystemClock.uptimeMillis())) {
             performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
@@ -29,11 +34,13 @@ final class TouchpadView extends View {
         density = getResources().getDisplayMetrics().density;
         gestures = new TouchpadGestures(output, ViewConfiguration.get(context).getScaledTouchSlop()/density);
         setClickable(true); setFocusable(true);
-        setContentDescription("Touchpad. Tap to click, hold to drag. Two fingers scroll or tap to right-click.");
+        setContentDescription("Touchpad. Tap to click, tap then drag or hold to drag. "+
+            "Two fingers scroll, pinch to zoom, or tap to right-click. Three fingers switch desktops or show windows.");
         setBackgroundColor(Color.rgb(10, 10, 10));
     }
     void setDim(boolean value, boolean buttons) { dim = value; dimButtons = value && buttons; invalidate(); }
-    void cancel() { removeCallbacks(hold); gestures.cancel(); activity.touching(false); }
+    void configure(double speed, boolean reverseScroll) { gestures.configure(speed, reverseScroll); }
+    void cancel() { removeCallbacks(hold); removeCallbacks(momentum); gestures.cancel(); activity.touching(false); }
     @Override public void setEnabled(boolean enabled) { if (!enabled) cancel(); super.setEnabled(enabled); invalidate(); }
     @Override protected void onDetachedFromWindow() { cancel(); super.onDetachedFromWindow(); }
     private double coordinate(MotionEvent event, boolean x, int skipped) {
@@ -44,11 +51,16 @@ final class TouchpadView extends View {
         }
         return count == 0 ? 0 : total/count/density;
     }
+    private double span(MotionEvent event) {
+        if (event.getPointerCount() != 2) return 0;
+        return Math.hypot(event.getX(1)-event.getX(0), event.getY(1)-event.getY(0))/density;
+    }
     @Override public boolean onTouchEvent(MotionEvent event) {
         if (!isEnabled()) return false;
         int count = event.getPointerCount();
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                removeCallbacks(momentum);
                 getParent().requestDisallowInterceptTouchEvent(true);
                 activity.touching(true);
                 gestures.begin(event.getX()/density, event.getY()/density,
@@ -57,17 +69,34 @@ final class TouchpadView extends View {
                 return true;
             case MotionEvent.ACTION_POINTER_DOWN:
                 removeCallbacks(hold);
-                gestures.fingers(count, coordinate(event, true, -1), coordinate(event, false, -1));
+                gestures.fingers(count, coordinate(event, true, -1), coordinate(event, false, -1),
+                    span(event), event.getEventTime());
                 return true;
             case MotionEvent.ACTION_POINTER_UP:
                 gestures.fingers(count-1, coordinate(event, true, event.getActionIndex()),
-                    coordinate(event, false, event.getActionIndex()));
+                    coordinate(event, false, event.getActionIndex()), 0, event.getEventTime());
                 return true;
             case MotionEvent.ACTION_MOVE:
-                gestures.move(coordinate(event, true, -1), coordinate(event, false, -1), count);
+                // Batched samples preserve slow motion and scroll velocity.
+                for (int h=0; h<event.getHistorySize(); h++) {
+                    double x = 0, y = 0;
+                    for (int p=0; p<count; p++) {
+                        x += event.getHistoricalX(p, h); y += event.getHistoricalY(p, h);
+                    }
+                    double historicalSpan = count == 2 ? Math.hypot(
+                        event.getHistoricalX(1,h)-event.getHistoricalX(0,h),
+                        event.getHistoricalY(1,h)-event.getHistoricalY(0,h))/density : 0;
+                    gestures.move(x/count/density, y/count/density, count,
+                        historicalSpan, event.getHistoricalEventTime(h));
+                }
+                gestures.move(coordinate(event, true, -1), coordinate(event, false, -1), count,
+                    span(event), event.getEventTime());
                 return true;
             case MotionEvent.ACTION_UP:
-                removeCallbacks(hold); gestures.end(event.getEventTime()); activity.touching(false);
+                removeCallbacks(hold);
+                gestures.move(event.getX()/density, event.getY()/density, 1, 0, event.getEventTime());
+                gestures.end(event.getEventTime()); activity.touching(false);
+                postOnAnimation(momentum);
                 return true;
             case MotionEvent.ACTION_CANCEL:
                 cancel(); return true;
@@ -93,9 +122,11 @@ final class TouchpadView extends View {
             canvas.drawText("RIGHT", getWidth()*3/4f, y, paint);
             canvas.drawText("Swipe to scroll · hold + tilt to drag", getWidth()/2f, y+32*density, paint);
         } else {
-            canvas.drawText("TOUCHPAD", getWidth()/2f, y-28*density, paint);
-            canvas.drawText("Tap to click · hold to drag", getWidth()/2f, y+4*density, paint);
-            canvas.drawText("Two fingers: scroll / tap for right-click", getWidth()/2f, y+32*density, paint);
+            canvas.drawText("TOUCHPAD", getWidth()/2f, y-42*density, paint);
+            paint.setTextSize(12*density);
+            canvas.drawText("Tap to click · tap then drag to move items", getWidth()/2f, y-12*density, paint);
+            canvas.drawText("Two fingers: scroll · pinch · right-click", getWidth()/2f, y+14*density, paint);
+            canvas.drawText("Three fingers: desktops / windows", getWidth()/2f, y+40*density, paint);
         }
     }
 }

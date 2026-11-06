@@ -32,6 +32,19 @@ final class KeyboardReports {
     synchronized Result navigate(boolean forward, boolean mac) {
         return key(mac ? (forward ? 0x30 : 0x2f) : (forward ? 0x4f : 0x50), mac ? 8 : 4);
     }
+    synchronized Result zoom(int steps, boolean mac) {
+        if (steps == 0 || steps < -3 || steps > 3) return Result.UNSUPPORTED;
+        if (queue.size() > LIMIT-2*Math.abs(steps)) return Result.FULL;
+        for (int i=0; i<Math.abs(steps); i++)
+            enqueue(steps > 0 ? 0x2e : 0x2d, (mac ? 8 : 1) | (steps > 0 ? 2 : 0));
+        return Result.OK;
+    }
+    synchronized Result workspace(boolean horizontal, int direction, boolean mac) {
+        if (direction != -1 && direction != 1) return Result.UNSUPPORTED;
+        if (horizontal) return key(direction < 0 ? 0x4f : 0x50, mac ? 1 : 9);
+        return mac ? key(direction < 0 ? 0x52 : 0x51, 1)
+            : key(direction < 0 ? TAB : 0x07, 8);
+    }
     synchronized boolean isIdle() {
         if (!queue.isEmpty()) return false;
         for (byte value : current) if (value != 0) return false;

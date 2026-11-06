@@ -67,6 +67,25 @@ public final class KeyboardReportsTest {
         q.navigate(true, false);
         check(q.next()[0] == 4 && !q.isIdle(), "held modifiers keep the keyboard busy between press and release");
         check(Arrays.equals(q.next(), new byte[8]) && q.isIdle(), "navigation releases modifiers before scrolling can run");
+        q.zoom(2, true);
+        key(q, 0x2e, 10, "Mac zoom-in presses Command-Plus");
+        key(q, 0x2e, 10, "multiple zoom steps preserve balanced key releases");
+        q.zoom(-1, false);
+        key(q, 0x2d, 1, "Windows zoom-out presses Control-Minus");
+        q.workspace(true, -1, true);
+        key(q, 0x4f, 1, "leftward Mac swipe switches to the next desktop with Control-Right");
+        q.workspace(true, 1, false);
+        key(q, 0x50, 9, "rightward Windows swipe switches desktop with Control-Windows-Left");
+        q.workspace(false, -1, true);
+        key(q, 0x52, 1, "Mac upward swipe opens Mission Control");
+        q.workspace(false, 1, true);
+        key(q, 0x51, 1, "Mac downward swipe opens application windows");
+        q.workspace(false, -1, false);
+        key(q, 0x2b, 8, "Windows upward swipe opens Task View");
+        q.workspace(false, 1, false);
+        key(q, 0x07, 8, "Windows downward swipe shows the desktop");
+        check(q.zoom(100, true) == KeyboardReports.Result.UNSUPPORTED && q.isIdle(),
+            "invalid zoom count cannot enqueue an unbounded shortcut burst");
         TextEdit correction = TextEdit.between("teh ", "the ");
         check(correction.backspaces == 3 && correction.inserted.equals("he "), "IME correction only replaces the changed suffix");
         TextEdit deletion = TextEdit.between("hello", "hell");

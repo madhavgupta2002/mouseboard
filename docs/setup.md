@@ -55,8 +55,13 @@ and keyboard input are handled by Windows through the standard HID profile.
 | Centre scroll strip | Slide vertically to scroll |
 | Touchpad / Buttons | Switch between a touchpad and tilt with click pads; choice is saved |
 | Touchpad: one finger | Move the pointer; tap anywhere for left-click |
-| Touchpad: hold, then move | Drag until the finger is lifted |
-| Touchpad: two fingers | Swipe to scroll; tap for right-click |
+| Touchpad: double-tap | Double-click |
+| Touchpad: tap, then touch and move | Drag immediately on the second touch; lift to drop |
+| Touchpad: hold, then move | Alternative way to start dragging |
+| Touchpad: two fingers | Scroll vertically or sideways with momentum; tap for right-click |
+| Touchpad: pinch | Zoom in/out using application shortcuts |
+| Touchpad: three fingers sideways | Switch desktop/workspace |
+| Touchpad: three fingers up/down | Mac: Mission Control/app windows; Windows: Task View/show desktop |
 | Back / Forward | Browser/navigation shortcuts for the selected desktop OS |
 | Dim | Barely lit black touch surface; Exit dim returns to the normal screen |
 | Keyboard | Open the phone's normal keyboard |
@@ -70,8 +75,21 @@ the mode in settings, and later launches keep your choice.
 Tilt input is disabled while Touchpad mode is selected.
 
 **Back / Forward** defaults to Mac shortcuts (Command + bracket). Turn off
-**Mac Back / Forward shortcuts** in Settings for Windows (Alt + arrow).
+**Mac gesture shortcuts** in Settings for Windows (Alt + arrow).
 These controls work in applications that support the corresponding shortcuts.
+
+Touchpad pointer speed is separate from tilt sensitivity. **Reverse touchpad
+scrolling** lets you match the scroll direction to the computer's settings.
+A quick two-finger swipe coasts after lifting; touching again stops the coast.
+Tap-then-drag accepts the second touch within 300 ms near the first tap.
+
+Pinch sends Command + Plus/Minus on Mac, Control + Plus/Minus on Windows.
+Three-finger sideways swipes send Control + Left/Right on Mac and
+Control + Windows + Left/Right on Windows. Mac's default Mission Control and
+application-window shortcuts are Control + Up/Down. Custom OS shortcuts may
+need to be restored for these gestures. These are mouse/keyboard shortcuts,
+not native Apple multi-touch events: Force Click and app-specific native
+trackpad animations are not implemented.
 
 In **Dim**, touchpad mode keeps the same gestures. In button mode, tap the left
 or right half to click, hold and tilt to drag, or swipe to scroll. The screen is

@@ -182,6 +182,16 @@ final class HidMouseConnection {
             return connected && active ? keyboard.navigate(forward, mac) : KeyboardReports.Result.FULL;
         }
     }
+    KeyboardReports.Result zoom(int steps, boolean mac) {
+        synchronized (outputLock) {
+            return connected && active ? keyboard.zoom(steps, mac) : KeyboardReports.Result.FULL;
+        }
+    }
+    KeyboardReports.Result workspace(boolean horizontal, int direction, boolean mac) {
+        synchronized (outputLock) {
+            return connected && active ? keyboard.workspace(horizontal, direction, mac) : KeyboardReports.Result.FULL;
+        }
+    }
     KeyboardReports.Result edit(int backspaces, String text) {
         synchronized (outputLock) {
             return connected && active ? keyboard.edit(backspaces, text) : KeyboardReports.Result.FULL;

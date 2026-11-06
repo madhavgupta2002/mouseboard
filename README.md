@@ -4,6 +4,10 @@ Turn an Android phone into a Bluetooth mouse and keyboard for a Mac or Windows
 PC. Tilt to move the pointer or switch to a touchpad, hold to drag, swipe to
 scroll, and type with the phone's normal keyboard.
 
+Touchpad mode includes tap/double-tap, tap-then-drag, two-finger scrolling with
+momentum, two-finger right-click, pinch zoom and three-finger desktop/window
+shortcuts. Pointer speed and scroll direction can be changed in Settings.
+
 MouseBoard uses standard Bluetooth HID. The desktop apps help with pairing and
 installing the Android controller; input goes directly to the operating system.
 No Wi-Fi connection, account or desktop input-injection service is required.
@@ -67,6 +71,9 @@ tests/
   a black, barely lit touch surface.
 - Sideways swipes use Shift + wheel; horizontal scrolling depends on the
   desktop application's support for that shortcut.
+- Pinch and three-finger gestures send keyboard shortcuts. They need compatible
+  app/OS shortcuts and do not turn the phone into a native Apple trackpad.
+  Force Click is not implemented.
 - Recenter sends an absolute pointer midpoint. Display mapping is controlled by
   the host OS and needs physical-device verification, especially with multiple
   monitors.

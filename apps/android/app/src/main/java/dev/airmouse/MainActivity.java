@@ -33,6 +33,7 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
+import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -269,15 +270,20 @@ public final class MainActivity extends Activity {
     }
 
     private TouchpadView newTouchpad() {
-        return new TouchpadView(this, new TouchpadGestures.Output() {
+        TouchpadView view = new TouchpadView(this, new TouchpadGestures.Output() {
             public void move(double x, double y) { if (connection != null) connection.move(x, y); }
             public void click(String button) { if (connection != null) connection.click(button); }
             public void button(String button, boolean down) { if (connection != null) connection.button(button, down); }
             public void scroll(double x, double y) {
                 if (connection == null) return;
-                // Lock each sample to its dominant axis to avoid diagonal jitter.
-                if (Math.abs(x) > Math.abs(y)) connection.scrollHorizontal(x);
-                else connection.scroll(y);
+                connection.scrollHorizontal(x);
+                connection.scroll(y);
+            }
+            public void zoom(int steps) {
+                if (connection != null) reportGesture(connection.zoom(steps));
+            }
+            public void swipe(boolean horizontal, int direction) {
+                if (connection != null) reportGesture(connection.workspace(horizontal, direction));
             }
         }, active -> {
             if (connection != null) {
@@ -286,6 +292,18 @@ public final class MainActivity extends Activity {
                 connection.touchBusy(active && !(dim && !touchpadMode));
             }
         });
+        configureTouchpad(view);
+        return view;
+    }
+    private void configureTouchpad(TouchpadView view) {
+        view.configure(1.8*(.5+preferences.getInt("touchpadSpeed", 50)/100.0),
+            preferences.getBoolean("reverseScroll", false));
+    }
+    private void reportGesture(KeyboardReports.Result result) {
+        if (result != KeyboardReports.Result.OK && SystemClock.elapsedRealtime()-lastInputError > 1500) {
+            lastInputError = SystemClock.elapsedRealtime();
+            toast("Typing queue is busy. Retry the gesture in a moment.");
+        }
     }
     private void buildDimPanel() {
         dimPanel = column(); dimPanel.setBackgroundColor(BLACK);
@@ -332,7 +350,7 @@ public final class MainActivity extends Activity {
     }
     private void navigate(boolean forward) {
         if (connection == null || !connected || paused) return;
-        editor.finishInput(); resetMotion();
+        releaseTouches(); editor.finishInput(); resetMotion();
         if (connection.navigate(forward) != KeyboardReports.Result.OK) toast("Wait for typing to finish and retry.");
     }
 
@@ -350,6 +368,7 @@ public final class MainActivity extends Activity {
 
     private void showKeyboard() {
         if (!connected || paused) { toast("Connect and resume MouseBoard first"); return; }
+        releaseTouches();
         editor.requestFocus();
         editor.post(() -> ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE))
             .showSoftInput(editor, InputMethodManager.SHOW_IMPLICIT));
@@ -496,6 +515,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showSettings() {
+        releaseTouches();
         LinearLayout panel = column();
         panel.setPadding(dp(24), dp(12), dp(24), dp(8));
         TextView speedLabel = label("", 14, TEXT);
@@ -513,6 +533,29 @@ public final class MainActivity extends Activity {
             public void onStopTrackingTouch(SeekBar bar) { resetMotion(); }
         });
         panel.addView(speed);
+        TextView touchSpeedLabel = label("Touchpad speed", 14, TEXT);
+        touchSpeedLabel.setPadding(0, dp(12), 0, 0);
+        panel.addView(touchSpeedLabel);
+        SeekBar touchSpeed = new SeekBar(this);
+        touchSpeed.setMax(150); touchSpeed.setProgress(preferences.getInt("touchpadSpeed", 50));
+        touchSpeed.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar bar, int value, boolean user) {
+                preferences.edit().putInt("touchpadSpeed", value).apply();
+                configureTouchpad(touchpadView); configureTouchpad(dimTouchpad);
+            }
+            public void onStartTrackingTouch(SeekBar bar) { releaseTouches(); }
+            public void onStopTrackingTouch(SeekBar bar) { }
+        });
+        panel.addView(touchSpeed);
+        Switch reverse = new Switch(this);
+        reverse.setText("Reverse touchpad scrolling");
+        reverse.setTextColor(TEXT); reverse.setTextSize(13);
+        reverse.setChecked(preferences.getBoolean("reverseScroll", false));
+        reverse.setOnCheckedChangeListener((v,checked) -> {
+            releaseTouches(); preferences.edit().putBoolean("reverseScroll", checked).apply();
+            configureTouchpad(touchpadView); configureTouchpad(dimTouchpad);
+        });
+        panel.addView(reverse);
         Switch mode = new Switch(this);
         mode.setText("Turn left/right (default)");
         mode.setTextSize(13); mode.setTextColor(TEXT); mode.setChecked(turnMode);
@@ -521,23 +564,31 @@ public final class MainActivity extends Activity {
         });
         panel.addView(mode);
         Switch host = new Switch(this);
-        host.setText("Mac Back / Forward shortcuts");
+        host.setText("Mac gesture shortcuts");
         host.setTextSize(13); host.setTextColor(TEXT);
         host.setChecked(preferences.getBoolean("macShortcuts", true));
         host.setOnCheckedChangeListener((v,checked) ->
             preferences.edit().putBoolean("macShortcuts", checked).apply());
         panel.addView(host);
         TextView note = label("Typing: set your Mac input source to ABC / US.\n"+
-            "Turn off Mac shortcuts when connected to Windows.\n\n"+
-            "Touchpad: one finger moves, tap clicks, hold drags. "+
-            "Two fingers scroll; two-finger tap right-clicks.\n\n"+
+            "Turn off Mac gesture shortcuts when connected to Windows.\n\n"+
+            "Touchpad: tap to click, double-tap to double-click. "+
+            "Tap, then touch again and move to drag; holding also drags.\n\n"+
+            "Two fingers scroll with momentum or tap to right-click. "+
+            "Pinch zooms in apps that support the shortcut. "+
+            "Three fingers swipe sideways between desktops; swipe up for windows, down for app windows "+
+            "(on Windows, down shows the desktop).\n\n"+
             "Background control stays active until you disconnect. "+
             "Dim keeps touch working with the display barely lit. "+
             "A locked/off screen cannot receive taps.\n\n"+
-            "Horizontal scrolling uses Shift + wheel where supported.\n\nBluetooth only · v0.5.0", 12, MUTED);
+            "Match scrolling to your computer with Reverse touchpad scrolling. "+
+            "Horizontal scrolling uses Shift + wheel where supported. "+
+            "Force Click and native trackpad-only gestures are not available.\n\nBluetooth only · v0.5.1", 12, MUTED);
         note.setPadding(0, dp(20), 0, 0);
         panel.addView(note);
-        new AlertDialog.Builder(this).setTitle("Settings").setView(panel)
+        ScrollView scroller = new ScrollView(this);
+        scroller.addView(panel);
+        new AlertDialog.Builder(this).setTitle("Settings").setView(scroller)
             .setPositiveButton("Done", null)
             .setNeutralButton("Bluetooth", (d,w) -> openBluetooth()).show();
     }

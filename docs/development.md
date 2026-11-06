@@ -98,11 +98,25 @@ It still requests no Internet permission. The service starts from the visible
 activity after Bluetooth permission has been granted.
 
 `TouchpadGestures` contains the Android-independent gesture state; `TouchpadView`
-adapts motion events, centroid changes and long-press timing. One finger moves
-the pointer, tapping clicks, holding starts a drag, and two fingers scroll or
-tap to right-click. Pointer motion is suppressed throughout a multi-touch
-gesture, including after one finger lifts. Cancellation and mode changes release
-drag buttons. The selected mode persists; touchpad mode stops tilt sensing.
+adapts motion events (including batched historical samples), centroid changes
+and long-press timing. One finger moves the pointer with a 0.5 dp starting
+threshold, independently of the larger tap/scroll slop. Tapping clicks; a second
+touch within 300 ms can drag immediately, or a long press starts a drag.
+Two fingers scroll or tap to right-click.
+
+Scrolling velocity uses an exponential average and a 150 ms exponential decay
+after release. New touches, cancellation, toolbar actions and suspended frames
+stop momentum. Pointer speed and scroll direction are persistent settings.
+Both scroll axes are retained; the HID wheel still has discrete steps, rather
+than native trackpad pixel scrolling.
+
+Two-finger centroid travel and span changes distinguish scrolling from pinch.
+Once chosen, the gesture type stays fixed until release. A 15% pinch step
+queues an app zoom shortcut; three-finger swipes send a desktop/window shortcut
+once per gesture. These use the existing keyboard report, preserving pairing.
+Pointer motion is suppressed throughout a multi-touch gesture, including after
+one finger lifts. Cancellation and mode changes release drag buttons. The
+selected mode persists; touchpad mode stops tilt sensing.
 
 Dim mode uses the same surface with low requested window brightness and hidden
 system bars. In button mode it maps the two halves to clicks and one-finger
@@ -128,7 +142,8 @@ angular wrapping and position hysteresis.
 The Java tests cover motion noise, slow aiming, fast sweeps, sample-rate
 consistency, drag persistence, cancellation, scrolling, repeated recentering, report descriptors,
 keyboard mapping, navigation shortcuts, queue bounds, IME suffix edits,
-touchpad movement, two-finger transitions and drag cancellation.
+touchpad fine movement, tap-then-drag, multi-finger transitions, pinch/scroll
+classification, momentum decay/cancellation, OS shortcuts and drag cancellation.
 
 Full verification also runs Swift checks for stale HID profiles and report-ID
 alignment. Reading the active profile does not capture keyboard or mouse input.
