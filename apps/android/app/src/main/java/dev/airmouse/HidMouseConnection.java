@@ -205,9 +205,13 @@ final class HidMouseConnection {
             try {
                 if (centerPending) {
                     centerPending = false;
-                    if (!proxy.sendReport(device, HidDescriptor.MOUSE, new byte[4]) ||
-                            !proxy.sendReport(device, HidDescriptor.CENTER, HidDescriptor.CENTER_REPORT)) {
+                    if (!proxy.sendReport(device, HidDescriptor.MOUSE, new byte[4])) {
                         fail(id, "Could not center the pointer. Reconnect and try again."); return;
+                    }
+                    for (byte[] position : HidDescriptor.centerReports()) {
+                        if (!proxy.sendReport(device, HidDescriptor.CENTER, position)) {
+                            fail(id, "Could not center the pointer. Reconnect and try again."); return;
+                        }
                     }
                 }
                 byte[] report = reports.next();

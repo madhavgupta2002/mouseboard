@@ -4,6 +4,16 @@ package dev.airmouse;
 final class HidDescriptor {
     static final int MOUSE = 1, KEYBOARD = 2, CENTER = 3;
     static final byte[] CENTER_REPORT = {0x00, 0x40, 0x00, 0x40};
+
+    static byte[][] centerReports() {
+        // Hosts cache absolute axes independently of relative mouse movement.
+        // Change both axes by one unit first so every press emits a new center event.
+        return new byte[][]{
+            {(byte)0xff, 0x3f, (byte)0xff, 0x3f}, // 16383, 16383
+            CENTER_REPORT.clone()                // 16384, 16384
+        };
+    }
+
     static final byte[] BYTES = {
         0x05, 0x01, 0x09, 0x02, (byte)0xa1, 0x01,
         (byte)0x85, MOUSE, 0x09, 0x01, (byte)0xa1, 0x00,

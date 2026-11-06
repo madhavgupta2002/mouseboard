@@ -12,6 +12,21 @@ public final class MouseReportsTest {
     private static void report(MouseReports queue, int buttons, int x, int y, String name) {
         check(Arrays.equals(queue.next(), new byte[]{(byte)buttons, (byte)x, (byte)y, 0}), name);
     }
+    private static int axis(byte[] report, int offset) {
+        return (report[offset] & 255) | ((report[offset + 1] & 255) << 8);
+    }
+    private static final class AbsoluteHost {
+        // Like IOHIDElementPrivate::processReport, ignore unchanged absolute values.
+        // Relative motion changes the cursor but leaves this absolute cache intact.
+        int absoluteX = 16384, absoluteY = 16384, cursorX = 16384, cursorY = 16384;
+        boolean receive(byte[] report) {
+            int x = axis(report, 0), y = axis(report, 2);
+            if (absoluteX == x && absoluteY == y) return false;
+            absoluteX = cursorX = x;
+            absoluteY = cursorY = y;
+            return true;
+        }
+    }
     public static void main(String[] args) throws java.io.IOException {
         MouseReports q = new MouseReports();
         check(q.next() == null, "idle mouse sends no movement");
@@ -101,6 +116,24 @@ public final class MouseReportsTest {
         check(((center[0]&255) | ((center[1]&255)<<8)) == 16384 &&
             ((center[2]&255) | ((center[3]&255)<<8)) == 16384,
             "recenter targets the midpoint of both absolute axes");
+        AbsoluteHost host = new AbsoluteHost();
+        host.cursorX += 400; host.cursorY -= 250;
+        check(!host.receive(center) && host.cursorX != 16384 && host.cursorY != 16384,
+            "regression: a repeated absolute midpoint is ignored after relative movement");
+        for (int press = 1; press <= 5; press++) {
+            byte[][] sequence = HidDescriptor.centerReports();
+            check(sequence.length == 2 && axis(sequence[0], 0) == 16383 &&
+                axis(sequence[0], 2) == 16383, "recenter " + press + " changes both cached absolute axes");
+            check(host.receive(sequence[0]) && host.receive(sequence[1]),
+                "recenter " + press + " produces two fresh absolute events");
+            check(Arrays.equals(sequence[1], center) && host.cursorX == 16384 && host.cursorY == 16384,
+                "recenter " + press + " finishes at the exact midpoint");
+            host.cursorX += press * 100; host.cursorY -= press * 70;
+        }
+        byte[][] modified = HidDescriptor.centerReports();
+        modified[0][0] = 0; modified[1][0] = 1;
+        check(axis(HidDescriptor.centerReports()[0], 0) == 16383 && axis(center, 0) == 16384,
+            "a send buffer cannot corrupt future recenter sequences");
         System.out.println(checks + " Bluetooth report checks passed.");
         if (args.length == 1) {
             java.nio.file.Files.write(java.nio.file.Paths.get(args[0]), HidDescriptor.BYTES);

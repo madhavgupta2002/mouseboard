@@ -53,6 +53,18 @@ The host can send keyboard LED state as a one-byte output report on ID 2.
 Mouse button transitions and key-down/key-up pairs use bounded queues.
 Pause/disconnect sends neutral mouse and keyboard reports.
 
+Recenter sends two absolute positions: `(16383, 16383)`, then the exact midpoint
+`(16384, 16384)`. macOS caches absolute HID values separately from relative
+movement and can ignore an unchanged absolute report. Sending the midpoint
+alone therefore worked once but could fail after moving the cursor again.
+The one-unit lead-in changes both cached axes, so every press finishes with a
+fresh center event. Version 0.4.1 changes only the report sequence, not the HID
+descriptor; this update does not require a new Bluetooth pairing.
+
+The regression test models unchanged-value filtering in Apple's
+[`IOHIDElementPrivate::processReport`](https://github.com/apple-oss-distributions/IOHIDFamily/blob/main/IOHIDFamily/IOHIDElementPrivate.cpp)
+and repeats the move/recenter cycle five times.
+
 The original mouse-only edition used three bytes and no report ID. A host that
 keeps that old descriptor while receiving a numbered mouse report reads the
 button byte as X and horizontal movement as Y. This was observed in the affected
@@ -83,7 +95,7 @@ angular wrapping and position hysteresis.
 ## Verification limits
 
 The Java tests cover motion noise, slow aiming, fast sweeps, sample-rate
-consistency, drag persistence, cancellation, scrolling, report descriptors,
+consistency, drag persistence, cancellation, scrolling, repeated recentering, report descriptors,
 keyboard mapping, queue bounds and IME suffix edits.
 
 Full verification also runs Swift checks for stale HID profiles and report-ID

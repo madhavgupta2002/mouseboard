@@ -82,3 +82,7 @@ characters are rejected with a message rather than partially typed.
 On a single display, Recenter targets its midpoint. Multi-display mapping is
 controlled by the host OS. The absolute report format is tested, but actual
 mapping must be checked on the physical phone/computer pair.
+
+If Recenter only works once after connecting, update the Android app to 0.4.1
+or later. It sends a fresh absolute position on every press, without changing
+the Bluetooth profile or requiring re-pairing.

@@ -404,7 +404,7 @@ public final class MainActivity extends Activity implements SensorEventListener 
         TextView note = label("Typing: set your Mac input source to ABC / US.\n"+
             "English text and punctuation; no emoji yet.\n\n"+
             "If the updated controls do not work, forget the phone on the computer, "+
-            "then pair again with MouseBoard open.\n\nBluetooth only · v0.4.0", 12, MUTED);
+            "then pair again with MouseBoard open.\n\nBluetooth only · v0.4.1", 12, MUTED);
         note.setPadding(0, dp(20), 0, 0);
         panel.addView(note);
         new AlertDialog.Builder(this).setTitle("Settings").setView(panel)
