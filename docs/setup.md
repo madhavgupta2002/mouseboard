@@ -8,7 +8,9 @@ from the source Android identifies if needed. Managed-device policy can prevent
 installation of locally built APKs.
 
 Open **MouseBoard**, grant **Nearby devices**, then tap **Connect** and select
-the paired computer. Keep the controller visible.
+the paired computer. Allow notifications for the ongoing connection controls.
+The connection stays active when you switch apps or lock the phone. Disconnect
+in the app or its notification when finished.
 
 If upgrading from an older mouse-only build, the computer may have cached the
 old HID descriptor. If new controls fail, remove the old pairing on both devices,
@@ -51,14 +53,38 @@ and keyboard input are handled by Windows through the standard HID profile.
 | Recenter | Reset the phone's neutral grip and send the pointer to the host's mapped display midpoint |
 | LEFT / RIGHT | Tap to click; keep pressed and tilt to drag |
 | Centre scroll strip | Slide vertically to scroll |
+| Touchpad / Buttons | Switch between a touchpad and tilt with click pads; choice is saved |
+| Touchpad: one finger | Move the pointer; tap anywhere for left-click |
+| Touchpad: hold, then move | Drag until the finger is lifted |
+| Touchpad: two fingers | Swipe to scroll; tap for right-click |
+| Back / Forward | Browser/navigation shortcuts for the selected desktop OS |
+| Dim | Barely lit black touch surface; Exit dim returns to the normal screen |
 | Keyboard | Open the phone's normal keyboard |
 | Pause | Stop input and release held buttons and keys |
-| ⋯ | Sensitivity, tilt/turn mode and Bluetooth settings |
+| ⋯ | Sensitivity, tilt/turn mode, Mac/Windows shortcuts and Bluetooth settings |
 
 Turning the phone left/right controls horizontal movement by default; lifting
 or lowering its top controls vertical movement. Version 0.4.0 also enables
 this mode once when upgrading an existing installation. You can still change
 the mode in settings, and later launches keep your choice.
+Tilt input is disabled while Touchpad mode is selected.
+
+**Back / Forward** defaults to Mac shortcuts (Command + bracket). Turn off
+**Mac Back / Forward shortcuts** in Settings for Windows (Alt + arrow).
+These controls work in applications that support the corresponding shortcuts.
+
+In **Dim**, touchpad mode keeps the same gestures. In button mode, tap the left
+or right half to click, hold and tilt to drag, or swipe to scroll. The screen is
+still on at minimum requested brightness: Android does not deliver normal
+touchscreen taps to an app with the display switched off. Use Dim for touch
+controls, or lock the phone to use tilt motion alone in Buttons mode.
+Sideways scrolling uses Shift + wheel and depends on the receiving application.
+
+The foreground service owns Bluetooth and motion sensing. Its notification
+provides Pause/Resume and Disconnect. In tilt mode a partial wake lock keeps
+motion processing running while the screen sleeps; this uses battery. Android
+or Samsung power restrictions may still stop the service. If that happens,
+set MouseBoard's battery use to **Unrestricted** in Android app settings.
 
 Click a text field on the computer before typing. The phone displays recent
 typed text, but does not read or mirror the computer's document.
@@ -69,7 +95,8 @@ characters are rejected with a message rather than partially typed.
 
 ## Troubleshooting
 
-- Keep Bluetooth on and keep MouseBoard in the foreground.
+- Keep Bluetooth on. Open MouseBoard to start a connection; its service then
+  maintains it in the background.
 - Check the phone's Nearby devices permission.
 - Close other phone apps that register as Bluetooth keyboards or mice; Android
   allows only one HID device app to register at a time.

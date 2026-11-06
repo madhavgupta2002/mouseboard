@@ -8,18 +8,17 @@ import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.content.Intent;
+import android.content.ComponentName;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.TextUtils;
@@ -31,6 +30,7 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Switch;
@@ -40,28 +40,50 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public final class MainActivity extends Activity implements SensorEventListener {
+public final class MainActivity extends Activity {
     private static final int BLACK = Color.BLACK, PANEL = Color.rgb(10, 10, 10);
     private static final int LINE = Color.rgb(38, 38, 38), TEXT = Color.rgb(245, 245, 245);
     private static final int MUTED = Color.rgb(145, 145, 145);
     private static final int BLUETOOTH_PERMISSION = 10, ENABLE_BLUETOOTH = 11;
-    private SensorManager sensors;
-    private Sensor rotation;
-    private final MotionMath motion = new MotionMath();
-    private final float[] quaternion = new float[4];
-    private HidMouseConnection connection;
+    private MouseBoardService connection;
     private BluetoothAdapter adapter;
     private SharedPreferences preferences;
     private TextView status, keyboardHint;
-    private Button connectButton, pauseButton, recenterButton, keyboardButton;
+    private Button connectButton, pauseButton, recenterButton, keyboardButton, modeButton, dimButton, backButton, forwardButton;
     private RemoteInput editor;
     private LinearLayout keyboardPanel;
+    private LinearLayout pads;
+    private FrameLayout screen;
+    private LinearLayout mainPanel, dimPanel;
+    private TouchpadView touchpadView, dimTouchpad;
     private ClickPad leftPad, rightPad;
-    private boolean connected, connecting, paused, turnMode, scrolling, keyboardVisible;
-    private long freezeUntil, lastInputError;
+    private boolean connected, connecting, paused, turnMode, keyboardVisible, touchpadMode, dim, bound;
+    private long lastInputError;
     private double gain;
     private String stateText = "Connect to your Mac";
     private String selectedMac = "";
+    private final MouseBoardService.Listener serviceListener = () -> {
+        connected = connection.connected; connecting = connection.connecting;
+        paused = connection.paused; stateText = connection.stateText; selectedMac = connection.deviceName;
+        touchpadMode = connection.touchpad;
+        if (!connected || paused) {
+            releaseTouches();
+            editor.resetContext();
+            if (dim) setDim(false);
+        }
+        updateMode();
+        refreshState();
+    };
+    private final ServiceConnection serviceBinding = new ServiceConnection() {
+        @Override public void onServiceConnected(ComponentName name, IBinder binder) {
+            connection = ((MouseBoardService.LocalBinder)binder).service();
+            connection.setListener(serviceListener);
+        }
+        @Override public void onServiceDisconnected(ComponentName name) {
+            connection = null; connected = connecting = paused = false;
+            stateText = "Bluetooth service stopped"; refreshState();
+        }
+    };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -77,30 +99,23 @@ public final class MainActivity extends Activity implements SensorEventListener 
                 .putInt("motionModeDefaultsVersion", 1).apply();
         }
         turnMode = preferences.getBoolean("turnMode", true);
-        sensors = (SensorManager)getSystemService(SENSOR_SERVICE);
-        rotation = sensors.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
-        if (rotation == null) rotation = sensors.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        touchpadMode = preferences.getBoolean("touchpad", false);
         BluetoothManager manager = (BluetoothManager)getSystemService(BLUETOOTH_SERVICE);
         adapter = manager == null ? null : manager.getAdapter();
-        connection = new HidMouseConnection(this, adapter, (message, paired, busy) -> {
-            connected = paired; connecting = busy; stateText = message;
-            if (!paired) {
-                paused = false; scrolling = false;
-                if (leftPad != null) { leftPad.release(); rightPad.release(); }
-                if (editor != null) editor.resetContext();
-            }
-            resetMotion();
-            refreshState();
-        });
         buildUI();
+        bound = bindService(new Intent(this, MouseBoardService.class), serviceBinding, BIND_AUTO_CREATE);
         if (adapter == null) { stateText = "Bluetooth is unavailable"; refreshState(); }
     }
 
     private void buildUI() {
         LinearLayout root = column();
+        mainPanel = root;
         root.setBackgroundColor(BLACK);
         root.setPadding(dp(12), dp(8), dp(12), dp(10));
-        setContentView(root);
+        screen = new FrameLayout(this);
+        screen.setBackgroundColor(BLACK);
+        screen.addView(root, new FrameLayout.LayoutParams(-1, -1));
+        setContentView(screen);
 
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -131,14 +146,14 @@ public final class MainActivity extends Activity implements SensorEventListener 
         recenterButton.setOnClickListener(view -> {
             editor.finishInput();
             resetMotion();
-            leftPad.release(); rightPad.release();
+            releaseTouches();
             connection.center();
             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
         });
         pauseButton = button("Pause", false);
         pauseButton.setOnClickListener(view -> {
             if (!connected) return;
-            leftPad.release(); rightPad.release();
+            releaseTouches();
             paused = !paused;
             connection.setActive(!paused);
             if (paused) hideKeyboard();
@@ -152,7 +167,29 @@ public final class MainActivity extends Activity implements SensorEventListener 
         addEqual(controls, keyboardButton, 44, true);
         root.addView(controls);
 
-        LinearLayout pads = new LinearLayout(this);
+        LinearLayout navigation = new LinearLayout(this);
+        backButton = button("‹ Back", false);
+        backButton.setOnClickListener(view -> navigate(false));
+        forwardButton = button("Forward ›", false);
+        forwardButton.setOnClickListener(view -> navigate(true));
+        modeButton = button("", false);
+        modeButton.setContentDescription("Switch between mouse buttons and touchpad");
+        modeButton.setOnClickListener(view -> {
+            releaseTouches(); touchpadMode = !touchpadMode;
+            if (connection != null) connection.setTouchpad(touchpadMode);
+            updateMode(); resetMotion();
+        });
+        dimButton = button("Dim", false);
+        dimButton.setOnClickListener(view -> setDim(true));
+        addEqual(navigation, backButton, 40, false);
+        addEqual(navigation, forwardButton, 40, true);
+        addEqual(navigation, modeButton, 40, true);
+        addEqual(navigation, dimButton, 40, true);
+        LinearLayout.LayoutParams navArea = new LinearLayout.LayoutParams(-1, dp(40));
+        navArea.topMargin = dp(6);
+        root.addView(navigation, navArea);
+
+        pads = new LinearLayout(this);
         pads.setMotionEventSplittingEnabled(true);
         leftPad = new ClickPad("LEFT", "left");
         rightPad = new ClickPad("RIGHT", "right");
@@ -164,7 +201,11 @@ public final class MainActivity extends Activity implements SensorEventListener 
         pads.addView(rightPad, new LinearLayout.LayoutParams(0, -1, 1));
         LinearLayout.LayoutParams padArea = new LinearLayout.LayoutParams(-1, 0, 1);
         padArea.topMargin = dp(10);
-        root.addView(pads, padArea);
+        FrameLayout pointerArea = new FrameLayout(this);
+        pointerArea.addView(pads, new FrameLayout.LayoutParams(-1, -1));
+        touchpadView = newTouchpad();
+        pointerArea.addView(touchpadView, new FrameLayout.LayoutParams(-1, -1));
+        root.addView(pointerArea, padArea);
 
         keyboardPanel = column();
         keyboardPanel.setBackground(outline(PANEL, 12));
@@ -181,7 +222,7 @@ public final class MainActivity extends Activity implements SensorEventListener 
                 }
                 return result == KeyboardReports.Result.OK;
             }
-            public void activity() { freezeUntil = SystemClock.elapsedRealtime()+220; connection.clearMotion(); }
+            public void activity() { if (connection != null) connection.freezeMotion(220); }
         });
         editor.setTextColor(TEXT);
         editor.setHintTextColor(MUTED);
@@ -222,7 +263,77 @@ public final class MainActivity extends Activity implements SensorEventListener 
         }
         root.setFocusableInTouchMode(true);
         root.requestFocus();
+        buildDimPanel();
+        updateMode();
         refreshState();
+    }
+
+    private TouchpadView newTouchpad() {
+        return new TouchpadView(this, new TouchpadGestures.Output() {
+            public void move(double x, double y) { if (connection != null) connection.move(x, y); }
+            public void click(String button) { if (connection != null) connection.click(button); }
+            public void button(String button, boolean down) { if (connection != null) connection.button(button, down); }
+            public void scroll(double x, double y) {
+                if (connection == null) return;
+                // Lock each sample to its dominant axis to avoid diagonal jitter.
+                if (Math.abs(x) > Math.abs(y)) connection.scrollHorizontal(x);
+                else connection.scroll(y);
+            }
+        }, active -> {
+            if (connection != null) {
+                if (active) editor.finishInput();
+                // In dim button mode a held press still permits tilt-to-drag.
+                connection.touchBusy(active && !(dim && !touchpadMode));
+            }
+        });
+    }
+    private void buildDimPanel() {
+        dimPanel = column(); dimPanel.setBackgroundColor(BLACK);
+        dimPanel.setPadding(dp(12), dp(48), dp(12), dp(24));
+        LinearLayout actions = new LinearLayout(this);
+        Button exit = button("Exit dim", false);
+        exit.setTextColor(MUTED);
+        exit.setOnClickListener(view -> setDim(false));
+        Button center = button("Recenter", false);
+        center.setTextColor(MUTED);
+        center.setOnClickListener(view -> { releaseTouches(); if (connection != null) connection.center(); });
+        addEqual(actions, exit, 48, false); addEqual(actions, center, 48, true);
+        dimPanel.addView(actions);
+        dimTouchpad = newTouchpad();
+        dimTouchpad.setBackgroundColor(BLACK);
+        dimPanel.addView(dimTouchpad, new LinearLayout.LayoutParams(-1, 0, 1));
+        dimPanel.setVisibility(View.GONE);
+        screen.addView(dimPanel, new FrameLayout.LayoutParams(-1, -1));
+    }
+    private void setDim(boolean value) {
+        if (value && (!connected || paused)) return;
+        releaseTouches(); hideKeyboard(); dim = value;
+        mainPanel.setVisibility(value ? View.GONE : View.VISIBLE);
+        dimPanel.setVisibility(value ? View.VISIBLE : View.GONE);
+        dimTouchpad.setDim(true, !touchpadMode);
+        WindowManager.LayoutParams attributes = getWindow().getAttributes();
+        attributes.screenBrightness = value ? .01f : WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;
+        getWindow().setAttributes(attributes);
+        getWindow().getDecorView().setSystemUiVisibility(value ?
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+            View.SYSTEM_UI_FLAG_FULLSCREEN : View.SYSTEM_UI_FLAG_VISIBLE);
+        resetMotion();
+    }
+    private void updateMode() {
+        modeButton.setText(touchpadMode ? "Buttons" : "Touchpad");
+        pads.setVisibility(touchpadMode ? View.GONE : View.VISIBLE);
+        touchpadView.setVisibility(touchpadMode ? View.VISIBLE : View.GONE);
+    }
+    private void releaseTouches() {
+        if (leftPad != null) { leftPad.release(); rightPad.release(); }
+        if (touchpadView != null) touchpadView.cancel();
+        if (dimTouchpad != null) dimTouchpad.cancel();
+        if (connection != null) connection.touchBusy(false);
+    }
+    private void navigate(boolean forward) {
+        if (connection == null || !connected || paused) return;
+        editor.finishInput(); resetMotion();
+        if (connection.navigate(forward) != KeyboardReports.Result.OK) toast("Wait for typing to finish and retry.");
     }
 
     private void keyboardVisibility(boolean visible) {
@@ -256,9 +367,10 @@ public final class MainActivity extends Activity implements SensorEventListener 
         strip.setContentDescription("Scroll. Slide one finger up or down.");
         final float[] last = {0};
         strip.setOnTouchListener((view, event) -> {
+            if (!connected || paused || connection == null) return false;
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    scrolling = true; last[0] = event.getY(); resetMotion();
+                    connection.touchBusy(true); last[0] = event.getY();
                     strip.setBackground(outline(Color.rgb(24,24,24), 12));
                     return true;
                 case MotionEvent.ACTION_MOVE:
@@ -266,7 +378,7 @@ public final class MainActivity extends Activity implements SensorEventListener 
                     last[0] = event.getY();
                     return true;
                 case MotionEvent.ACTION_UP: case MotionEvent.ACTION_CANCEL:
-                    scrolling = false; resetMotion();
+                    connection.touchBusy(false);
                     strip.setBackground(outline(PANEL, 12));
                     return true;
                 default: return true;
@@ -292,26 +404,25 @@ public final class MainActivity extends Activity implements SensorEventListener 
             setFocusable(false);
         }
         void release() {
-            if (held) connection.button(mouseButton, false);
+            if (held && connection != null) connection.button(mouseButton, false);
             held = false;
             setBackground(outline(PANEL, 12));
         }
         @Override public boolean onTouchEvent(MotionEvent event) {
-            if (!isEnabled()) return false;
+            if (!isEnabled() || connection == null) return false;
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     editor.finishInput();
                     held = true;
                     connection.clearMotion();
-                    freezeUntil = SystemClock.elapsedRealtime()+80;
+                    connection.freezeMotion(80);
                     connection.button(mouseButton, true);
                     setBackground(outline(Color.rgb(28,28,28), 12));
                     performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
                     return true;
                 case MotionEvent.ACTION_UP:
                     release();
-                    freezeUntil = SystemClock.elapsedRealtime()+120;
-                    motion.reset();
+                    connection.freezeMotion(120);
                     touchClick = true; performClick(); touchClick = false;
                     return true;
                 case MotionEvent.ACTION_CANCEL:
@@ -321,14 +432,15 @@ public final class MainActivity extends Activity implements SensorEventListener 
         }
         @Override public boolean performClick() {
             super.performClick();
-            if (!touchClick) { editor.finishInput(); connection.click(mouseButton); }
+            if (!touchClick && connection != null) { editor.finishInput(); connection.click(mouseButton); }
             return true;
         }
     }
 
     private void connectOrDisconnect() {
+        if (connection == null) return;
         if (connected || connecting) {
-            leftPad.release(); rightPad.release(); hideKeyboard();
+            releaseTouches(); hideKeyboard();
             connection.stop(); connected = connecting = paused = false;
             stateText = "Disconnected"; editor.resetContext(); refreshState(); return;
         }
@@ -340,18 +452,22 @@ public final class MainActivity extends Activity implements SensorEventListener 
         if (!adapter.isEnabled()) {
             startActivityForResult(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), ENABLE_BLUETOOTH); return;
         }
+        if (Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 12);
+        }
         List<BluetoothDevice> devices = new ArrayList<>(adapter.getBondedDevices());
         devices.sort((a,b) -> isComputer(a) != isComputer(b) ? (isComputer(a) ? -1 : 1)
             : HidMouseConnection.deviceName(a).compareToIgnoreCase(HidMouseConnection.deviceName(b)));
         if (devices.isEmpty()) {
-            new AlertDialog.Builder(this).setTitle("Pair your Mac")
+            new AlertDialog.Builder(this).setTitle("Pair your computer")
                 .setMessage("Pair in Bluetooth settings, then return to MouseBoard.")
                 .setPositiveButton("Bluetooth settings", (d,w) -> openBluetooth())
                 .setNegativeButton("Cancel", null).show(); return;
         }
         String[] names = new String[devices.size()];
         for (int i=0; i<devices.size(); i++) names[i] = HidMouseConnection.deviceName(devices.get(i));
-        new AlertDialog.Builder(this).setTitle("Choose your Mac").setItems(names, (d,index) -> {
+        new AlertDialog.Builder(this).setTitle("Choose your computer").setItems(names, (d,index) -> {
             selectedMac = names[index]; editor.resetContext(); paused = false; connecting = true;
             stateText = "Connecting…"; connection.start(devices.get(index)); refreshState();
         }).setNegativeButton("Cancel", null).show();
@@ -365,12 +481,15 @@ public final class MainActivity extends Activity implements SensorEventListener 
         if (status == null) return;
         status.setText(connected ? (paused ? "Paused" : "Connected · "+selectedMac) : stateText);
         connectButton.setText(connected ? "Disconnect" : connecting ? "Cancel" : "Connect");
-        connectButton.setEnabled(adapter != null);
+        connectButton.setEnabled(adapter != null && connection != null);
         pauseButton.setText(paused ? "Resume" : "Pause");
         pauseButton.setEnabled(connected);
         boolean ready = connected && !paused;
         recenterButton.setEnabled(ready);
         keyboardButton.setEnabled(ready);
+        backButton.setEnabled(ready); forwardButton.setEnabled(ready);
+        modeButton.setEnabled(connection != null); dimButton.setEnabled(ready);
+        touchpadView.setEnabled(ready); dimTouchpad.setEnabled(ready);
         leftPad.setEnabled(ready); rightPad.setEnabled(ready);
         editor.setEnabled(ready);
         leftPad.setAlpha(ready ? 1 : .45f); rightPad.setAlpha(ready ? 1 : .45f);
@@ -401,10 +520,21 @@ public final class MainActivity extends Activity implements SensorEventListener 
             turnMode = checked; preferences.edit().putBoolean("turnMode", checked).apply(); resetMotion();
         });
         panel.addView(mode);
+        Switch host = new Switch(this);
+        host.setText("Mac Back / Forward shortcuts");
+        host.setTextSize(13); host.setTextColor(TEXT);
+        host.setChecked(preferences.getBoolean("macShortcuts", true));
+        host.setOnCheckedChangeListener((v,checked) ->
+            preferences.edit().putBoolean("macShortcuts", checked).apply());
+        panel.addView(host);
         TextView note = label("Typing: set your Mac input source to ABC / US.\n"+
-            "English text and punctuation; no emoji yet.\n\n"+
-            "If the updated controls do not work, forget the phone on the computer, "+
-            "then pair again with MouseBoard open.\n\nBluetooth only · v0.4.1", 12, MUTED);
+            "Turn off Mac shortcuts when connected to Windows.\n\n"+
+            "Touchpad: one finger moves, tap clicks, hold drags. "+
+            "Two fingers scroll; two-finger tap right-clicks.\n\n"+
+            "Background control stays active until you disconnect. "+
+            "Dim keeps touch working with the display barely lit. "+
+            "A locked/off screen cannot receive taps.\n\n"+
+            "Horizontal scrolling uses Shift + wheel where supported.\n\nBluetooth only · v0.5.0", 12, MUTED);
         note.setPadding(0, dp(20), 0, 0);
         panel.addView(note);
         new AlertDialog.Builder(this).setTitle("Settings").setView(panel)
@@ -414,30 +544,28 @@ public final class MainActivity extends Activity implements SensorEventListener 
 
     private void openBluetooth() { startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)); }
     private void resetMotion() {
-        motion.reset(); connection.clearMotion(); freezeUntil = SystemClock.elapsedRealtime()+160;
+        if (connection != null) connection.resetMotion();
     }
-    @Override public void onSensorChanged(SensorEvent event) {
-        if (!connected || paused) return;
-        if (scrolling || SystemClock.elapsedRealtime() < freezeUntil) { motion.reset(); return; }
-        SensorManager.getQuaternionFromVector(quaternion, event.values);
-        double[] delta = motion.update(quaternion, event.timestamp/1e9, turnMode, gain);
-        connection.move(delta[0], delta[1]);
-    }
-    @Override public void onAccuracyChanged(Sensor sensor, int accuracy) { }
     @Override protected void onResume() {
         super.onResume();
-        if (rotation != null) sensors.registerListener(this, rotation, 16667);
         resetMotion();
     }
     @Override protected void onPause() {
         super.onPause();
-        sensors.unregisterListener(this);
-        leftPad.release(); rightPad.release(); connection.stop();
-        connected = connecting = paused = scrolling = false;
+        releaseTouches();
+        if (dim) setDim(false);
         editor.resetContext();
-        stateText = "Disconnected while app was in background"; refreshState();
     }
-    @Override protected void onDestroy() { connection.destroy(); super.onDestroy(); }
+    @Override protected void onDestroy() {
+        releaseTouches();
+        if (connection != null) connection.removeListener(serviceListener);
+        if (bound) unbindService(serviceBinding);
+        super.onDestroy();
+    }
+    @Override public void onBackPressed() {
+        if (dim) setDim(false);
+        else super.onBackPressed();
+    }
     @Override public void onRequestPermissionsResult(int request, String[] names, int[] result) {
         super.onRequestPermissionsResult(request, names, result);
         if (request != BLUETOOTH_PERMISSION) return;

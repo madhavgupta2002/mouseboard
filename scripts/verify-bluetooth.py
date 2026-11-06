@@ -14,16 +14,25 @@ expected = {
     "android.permission.BLUETOOTH",
     "android.permission.BLUETOOTH_ADMIN",
     "android.permission.BLUETOOTH_CONNECT",
+    "android.permission.FOREGROUND_SERVICE",
+    "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE",
+    "android.permission.WAKE_LOCK",
+    "android.permission.POST_NOTIFICATIONS",
 }
 assert names == expected, f"Unexpected APK permissions: {names}"
 assert "android.permission.INTERNET" not in permissions
-print("PASS: APK requests Bluetooth permissions only, with no Internet access")
+print("PASS: APK requests Bluetooth and background-service permissions, with no Internet access")
 assert "minSdkVersion:'28'" in badging
-assert "versionCode='6'" in badging
-assert "versionName='0.4.1'" in badging
+assert "versionCode='7'" in badging
+assert "versionName='0.5.0'" in badging
 print("PASS: Bluetooth APK version and Android 9 minimum are correct")
 assert "uses-feature: name='android.hardware.bluetooth'" in badging
 print("PASS: APK declares Bluetooth hardware support")
+tree = subprocess.check_output([str(AAPT), "dump", "xmltree", str(APK), "--file", "AndroidManifest.xml"], text=True)
+assert "MouseBoardService" in tree and "foregroundServiceType" in tree
+service_type = tree[tree.index("foregroundServiceType"):].splitlines()[0]
+assert int(service_type.rsplit("=", 1)[1], 16) == 0x10, "Expected connectedDevice service type"
+print("PASS: APK declares a foreground connected-device service")
 subprocess.run([str(ROOT / ".tools/android/build-tools/35.0.0/apksigner"), "verify", str(APK)], check=True)
 print("PASS: APK signature verifies")
 subprocess.run(["codesign", "--verify", "--deep", "--strict", str(ROOT / "dist/MouseBoard.app")], check=True)

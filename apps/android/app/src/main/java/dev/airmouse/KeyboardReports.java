@@ -29,6 +29,14 @@ final class KeyboardReports {
         enqueue(usage, modifiers);
         return Result.OK;
     }
+    synchronized Result navigate(boolean forward, boolean mac) {
+        return key(mac ? (forward ? 0x30 : 0x2f) : (forward ? 0x4f : 0x50), mac ? 8 : 4);
+    }
+    synchronized boolean isIdle() {
+        if (!queue.isEmpty()) return false;
+        for (byte value : current) if (value != 0) return false;
+        return true;
+    }
     private void enqueue(int usage, int modifiers) {
         if (capsLock && usage >= 4 && usage <= 29) modifiers ^= 2;
         byte[] press = new byte[8];

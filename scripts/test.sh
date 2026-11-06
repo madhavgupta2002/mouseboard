@@ -11,6 +11,7 @@ javac --release 8 -d "$ROOT/apps/android/build/tests" \
   "$ROOT/apps/android/app/src/main/java/dev/airmouse/MotionMath.java" "$ROOT/tests/android/MotionMathTest.java" \
   "$ROOT/apps/android/app/src/main/java/dev/airmouse/MouseReports.java" "$ROOT/tests/android/MouseReportsTest.java" \
   "$ROOT/apps/android/app/src/main/java/dev/airmouse/HidDescriptor.java" \
+  "$ROOT/apps/android/app/src/main/java/dev/airmouse/TouchpadGestures.java" "$ROOT/tests/android/TouchpadGesturesTest.java" \
   "$ROOT/apps/android/app/src/main/java/dev/airmouse/KeyboardReports.java" "$ROOT/tests/android/KeyboardReportsTest.java" \
   "$ROOT/apps/android/app/src/main/java/dev/airmouse/TextEdit.java" "$ROOT/tests/android/MotionStabilityTest.java"
 java -cp "$ROOT/apps/android/build/tests" dev.airmouse.MotionMathTest
@@ -18,6 +19,7 @@ java -cp "$ROOT/apps/android/build/tests" dev.airmouse.MotionStabilityTest
 java -cp "$ROOT/apps/android/build/tests" dev.airmouse.MouseReportsTest \
   "$ROOT/apps/android/build/tests/hid-descriptor.bin"
 java -cp "$ROOT/apps/android/build/tests" dev.airmouse.KeyboardReportsTest
+java -cp "$ROOT/apps/android/build/tests" dev.airmouse.TouchpadGesturesTest
 if [[ "$MODE" != "--unit-only" ]]; then
   mkdir -p "$ROOT/apps/macos/.build"
   swiftc "$ROOT/apps/macos/Sources/MouseBoard/HidInputProfile.swift" \

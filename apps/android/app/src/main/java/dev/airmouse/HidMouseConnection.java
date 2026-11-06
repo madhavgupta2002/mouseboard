@@ -27,6 +27,7 @@ final class HidMouseConnection {
     private volatile BluetoothDevice target;
     private volatile boolean connected, active = true;
     private boolean centerPending;
+    private double horizontalWheel;
     private volatile long generation;
 
     HidMouseConnection(Context context, BluetoothAdapter adapter, Listener listener) {
@@ -167,7 +168,20 @@ final class HidMouseConnection {
     void click(String button) { if (connected && active) reports.click(button); }
     void button(String button, boolean down) { if (connected && active) reports.button(button, down); }
     void scroll(double steps) { if (connected && active) reports.scroll(steps); }
-    void clearMotion() { reports.clearMotion(); }
+    void scrollHorizontal(double steps) {
+        synchronized (outputLock) {
+            if (connected && active && Double.isFinite(steps))
+                horizontalWheel = Math.max(-64, Math.min(64, horizontalWheel+steps));
+        }
+    }
+    void clearMotion() {
+        synchronized (outputLock) { reports.clearMotion(); horizontalWheel = 0; }
+    }
+    KeyboardReports.Result navigate(boolean forward, boolean mac) {
+        synchronized (outputLock) {
+            return connected && active ? keyboard.navigate(forward, mac) : KeyboardReports.Result.FULL;
+        }
+    }
     KeyboardReports.Result edit(int backspaces, String text) {
         synchronized (outputLock) {
             return connected && active ? keyboard.edit(backspaces, text) : KeyboardReports.Result.FULL;
@@ -182,6 +196,7 @@ final class HidMouseConnection {
         synchronized (outputLock) {
             if (!connected || !active) return;
             reports.clear();
+            horizontalWheel = 0;
             centerPending = true;
         }
     }
@@ -191,6 +206,7 @@ final class HidMouseConnection {
             active = value;
             reports.clear();
             keyboard.clear();
+            horizontalWheel = 0;
             centerPending = false;
             releaseButtons();
         }
@@ -220,7 +236,20 @@ final class HidMouseConnection {
                 }
                 byte[] keys = keyboard.next();
                 if (keys != null && !proxy.sendReport(device, HidDescriptor.KEYBOARD, keys)) {
-                    fail(id, "Bluetooth could not send keyboard input. Tap Connect to retry.");
+                    fail(id, "Bluetooth could not send keyboard input. Tap Connect to retry."); return;
+                }
+                // Shift+wheel is understood as horizontal scrolling by many desktop
+                // applications. Serialize it only between complete keyboard edits.
+                int horizontal = (int)horizontalWheel;
+                if (horizontal != 0 && keyboard.isIdle()) {
+                    byte[] shift = new byte[8]; shift[0] = 2;
+                    byte[] wheel = reports.current(); wheel[3] = (byte)horizontal;
+                    if (!proxy.sendReport(device, HidDescriptor.KEYBOARD, shift) ||
+                        !proxy.sendReport(device, HidDescriptor.MOUSE, wheel) ||
+                        !proxy.sendReport(device, HidDescriptor.KEYBOARD, new byte[8])) {
+                        fail(id, "Bluetooth could not send scrolling. Tap Connect to retry."); return;
+                    }
+                    horizontalWheel -= horizontal;
                 }
             } catch (RuntimeException error) { fail(id, "Bluetooth connection lost. Tap Connect to retry."); }
         }
@@ -247,6 +276,7 @@ final class HidMouseConnection {
             connected = false;
             reports.clear();
             keyboard.clear();
+            horizontalWheel = 0;
             centerPending = false;
             proxy = hid;
             device = target;

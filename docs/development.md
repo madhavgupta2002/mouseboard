@@ -77,6 +77,37 @@ The keyboard bridge uses the phone's normal input method and applies suffix
 edits for English composition and autocorrection. It does not read the
 computer's text or inject commands through a desktop receiver.
 
+Version 0.5.0 keeps the HID descriptor unchanged. Back/Forward enqueue balanced
+keyboard shortcuts: Command + bracket on Mac, Alt + arrow on Windows.
+Horizontal scrolling serializes Shift-down, a wheel report and Shift-up only
+while the keyboard queue is idle, preserving held mouse buttons. It relies on
+the receiving application's Shift-wheel behavior.
+
+## Background and touch input
+
+`MouseBoardService` owns the HID connection and rotation sensor. The activity
+binds to it; activity pause/destruction releases touch gestures without closing
+Bluetooth. A connected-device foreground notification exposes Pause/Resume
+and Disconnect. A partial wake lock is held only for active tilt sensing and
+released when paused, disconnected, destroyed or switched to touchpad mode.
+The service is non-sticky: process death requires an explicit reconnection.
+
+The manifest declares `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_CONNECTED_DEVICE`,
+`WAKE_LOCK` and `POST_NOTIFICATIONS` alongside the existing Bluetooth permissions.
+It still requests no Internet permission. The service starts from the visible
+activity after Bluetooth permission has been granted.
+
+`TouchpadGestures` contains the Android-independent gesture state; `TouchpadView`
+adapts motion events, centroid changes and long-press timing. One finger moves
+the pointer, tapping clicks, holding starts a drag, and two fingers scroll or
+tap to right-click. Pointer motion is suppressed throughout a multi-touch
+gesture, including after one finger lifts. Cancellation and mode changes release
+drag buttons. The selected mode persists; touchpad mode stops tilt sensing.
+
+Dim mode uses the same surface with low requested window brightness and hidden
+system bars. In button mode it maps the two halves to clicks and one-finger
+swipes to scrolling. This is an awake display, not touch capture while locked.
+
 ## Motion
 
 The default horizontal mapping uses left/right turning (relative yaw). Pitch
@@ -96,7 +127,8 @@ angular wrapping and position hysteresis.
 
 The Java tests cover motion noise, slow aiming, fast sweeps, sample-rate
 consistency, drag persistence, cancellation, scrolling, repeated recentering, report descriptors,
-keyboard mapping, queue bounds and IME suffix edits.
+keyboard mapping, navigation shortcuts, queue bounds, IME suffix edits,
+touchpad movement, two-finger transitions and drag cancellation.
 
 Full verification also runs Swift checks for stale HID profiles and report-ID
 alignment. Reading the active profile does not capture keyboard or mouse input.

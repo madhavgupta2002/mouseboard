@@ -56,6 +56,17 @@ public final class KeyboardReportsTest {
         int count = 0;
         while (q.next() != null) count++;
         check(count == 190, "printable ASCII has balanced key-down and key-up reports");
+        check(q.isIdle(), "keyboard is idle only after every key is released");
+        q.navigate(false, true);
+        check(!q.isIdle(), "navigation waits in the keyboard queue");
+        key(q, 0x2f, 8, "Mac Back uses Command-left bracket with balanced release");
+        q.navigate(true, true);
+        key(q, 0x30, 8, "Mac Forward uses Command-right bracket with balanced release");
+        q.navigate(false, false);
+        key(q, 0x50, 4, "Windows Back uses Alt-Left with balanced release");
+        q.navigate(true, false);
+        check(q.next()[0] == 4 && !q.isIdle(), "held modifiers keep the keyboard busy between press and release");
+        check(Arrays.equals(q.next(), new byte[8]) && q.isIdle(), "navigation releases modifiers before scrolling can run");
         TextEdit correction = TextEdit.between("teh ", "the ");
         check(correction.backspaces == 3 && correction.inserted.equals("he "), "IME correction only replaces the changed suffix");
         TextEdit deletion = TextEdit.between("hello", "hell");

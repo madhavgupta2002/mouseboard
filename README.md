@@ -1,8 +1,8 @@
 # MouseBoard
 
 Turn an Android phone into a Bluetooth mouse and keyboard for a Mac or Windows
-PC. Tilt to move the pointer, hold a click pad to drag, swipe to scroll, and type
-with the phone's normal keyboard.
+PC. Tilt to move the pointer or switch to a touchpad, hold to drag, swipe to
+scroll, and type with the phone's normal keyboard.
 
 MouseBoard uses standard Bluetooth HID. The desktop apps help with pairing and
 installing the Android controller; input goes directly to the operating system.
@@ -62,7 +62,11 @@ tests/
 
 - Typing supports English text and US punctuation. Use **ABC / US** as the
   computer's input source. Emoji and arbitrary Unicode are not implemented.
-- Keep the phone app visible; locking the phone or switching apps disconnects it.
+- The connection runs in a foreground service. Tilt mode can keep moving the
+  pointer with the display off; screen taps need the display on. **Dim** provides
+  a black, barely lit touch surface.
+- Sideways swipes use Shift + wheel; horizontal scrolling depends on the
+  desktop application's support for that shortcut.
 - Recenter sends an absolute pointer midpoint. Display mapping is controlled by
   the host OS and needs physical-device verification, especially with multiple
   monitors.
