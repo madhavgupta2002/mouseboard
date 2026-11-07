@@ -12,6 +12,7 @@
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
       </Grid.RowDefinitions>
       <Grid>
         <TextBlock Text="M O U S E B O A R D" FontSize="12" FontWeight="SemiBold" />
@@ -73,7 +74,7 @@
                        FontSize="15" FontWeight="SemiBold" />
             <TextBlock x:Name="PcNameText" FontSize="13"
                        Foreground="{StaticResource MutedBrush}" />
-            <TextBlock Text="Open MouseBoard on your phone, allow Nearby devices, tap Connect and select this PC."
+            <TextBlock Text="First time: on the phone tap Connect → Pair new computer, then here click Add device and choose the phone. Later: tap Connect and select this PC."
                        Margin="0,12,0,0" FontSize="13" Foreground="{StaticResource MutedBrush}" />
             <TextBlock Text="Tilt or use Touchpad." Margin="0,20,0,5"
                        FontSize="15" FontWeight="SemiBold" />
@@ -86,13 +87,37 @@
           </StackPanel>
         </Grid>
       </Border>
-      <Border Grid.Row="3" Background="#0A0A0A" CornerRadius="10" Padding="16,12" Margin="0,18,0,0">
+      <Border Grid.Row="3" Background="{StaticResource PanelBrush}" CornerRadius="16"
+              BorderBrush="#222222" BorderThickness="1" Padding="24" Margin="0,18,0,0">
+        <StackPanel>
+          <TextBlock Text="03   TROUBLESHOOT" FontSize="11"
+                     Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold" />
+          <TextBlock x:Name="TroubleshootStatus" Text="Checking Bluetooth…" Margin="0,14,0,14"
+                     FontSize="13" AutomationProperties.LiveSetting="Polite" />
+          <WrapPanel>
+            <Button Content="Add device" Click="AddDeviceClicked" Padding="10,7" Margin="0,0,6,6" />
+            <Button Content="Remove pairing" Click="RemoveClicked" Padding="10,7" Margin="0,0,6,6"
+                    AutomationProperties.Name="Remove the selected device's Windows pairing" />
+            <Button x:Name="DiagnosticsButton" Content="Copy diagnostics" Click="DiagnosticsClicked"
+                    Background="#F4F4F4" Foreground="Black" Padding="10,7" Margin="0,0,6,6" />
+            <Button Content="Open log folder" Click="LogFolderClicked" Padding="10,7" Margin="0,0,0,6" />
+          </WrapPanel>
+          <TextBlock x:Name="LogPathText" Margin="0,6,0,0" FontFamily="Consolas" FontSize="11"
+                     Foreground="{StaticResource MutedBrush}" />
+          <TextBox x:Name="DiagnosticsBox" Visibility="Collapsed" IsReadOnly="True" Margin="0,12,0,0"
+                   MaxHeight="260" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                   Background="#050505" Foreground="#D0D0D0" BorderBrush="#292929"
+                   FontFamily="Consolas" FontSize="11" TextWrapping="NoWrap"
+                   AutomationProperties.Name="Diagnostics report" />
+        </StackPanel>
+      </Border>
+      <Border Grid.Row="4" Background="#0A0A0A" CornerRadius="10" Padding="16,12" Margin="0,18,0,0">
         <TextBlock x:Name="ActionStatus"
                    Text="Windows receives standard Bluetooth input directly. You can close this helper after installation."
                    FontSize="12" Foreground="{StaticResource MutedBrush}"
                    AutomationProperties.LiveSetting="Polite" />
       </Border>
-      <TextBlock Grid.Row="4" Text="BLUETOOTH ONLY · NO NETWORK SERVER · NO ACCOUNT"
+      <TextBlock Grid.Row="5" Text="BLUETOOTH ONLY · NO NETWORK SERVER · NO ACCOUNT"
                  FontSize="10" Foreground="#777777" Margin="0,20,0,0" />
     </Grid>
   </ScrollViewer>

@@ -19,6 +19,23 @@ Check(new PairedDevice("Phone", 1, true, 0x0200).IsPhone &&
       !new PairedDevice("Headphones", 2, false, 0x0400).IsPhone,
     "Phone sorting distinguishes Bluetooth device classes");
 
+Guid hid = BluetoothDevices.HidService;
+var phoneOnly = new PairedDevice("Galaxy", 0x48EF1C348D9B, true, 0x5A020C, true, [new("0000110a-0000-1000-8000-00805f9b34fb")]);
+var mousePaired = phoneOnly with { Connected = false, Services = [hid] };
+var mouseConnected = phoneOnly with { Services = [hid] };
+Check(phoneOnly.AddressText == "48:EF:1C:34:8D:9B", "Bluetooth address is shown in standard order");
+Check(!phoneOnly.HasMouseService && mouseConnected.HasMouseService, "HID mouse service is detected from installed services");
+Check(Diagnosis.Diagnose(false, [], "PC").Contains("[W2]"), "Missing radio is diagnosed");
+Check(Diagnosis.Diagnose(true, [], "PC").Contains("[W3]"), "No pairing is diagnosed");
+Check(Diagnosis.Diagnose(true, [phoneOnly], "PC").Contains("[W5]"),
+    "Phone paired without mouse service is diagnosed as needing re-pairing (the 'connected but nothing works' case)");
+Check(Diagnosis.Diagnose(true, [mousePaired], "DESK").Contains("[W4]") &&
+      Diagnosis.Diagnose(true, [mousePaired], "DESK").Contains("DESK"), "Paired mouse awaiting phone connection is diagnosed");
+Check(Diagnosis.Diagnose(true, [phoneOnly, mouseConnected], "PC").Contains("[W0]"), "Connected mouse is reported ready");
+Check(Diagnosis.Describe(phoneOnly).Contains("Audio source") && Diagnosis.Describe(phoneOnly).Contains("connected=True"),
+    "Device descriptions name services for the log");
+Check(Marshal.SizeOf<BluetoothDevices.RadioSearch>() == 4, "Radio search structure matches the Windows ABI");
+
 string temporary = Path.Combine(Path.GetTempPath(), "mouseboard-check-" + Guid.NewGuid().ToString("N"));
 try
 {

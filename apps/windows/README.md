@@ -10,13 +10,15 @@ requires no account or administrator access.
 
 1. [Download MouseBoard-Windows-x64.exe](https://github.com/madhavgupta2002/mouseboard/raw/refs/heads/main/downloads/MouseBoard-Windows-x64.exe)
    and double-click it. No installer, ZIP extraction or .NET installation is needed.
-2. Pair the phone in **Bluetooth settings**.
-3. Click **Open Bluetooth sender**. In the Windows wizard choose your phone,
-   then browse to the APK path shown in MouseBoard. **Copy path** and **Show APK**
-   make the file easy to select. The helper does not claim a transfer has
-   completed; accept it on the phone.
-4. Install the APK and open MouseBoard on the phone. Allow Nearby devices, tap
-   Connect and choose the PC name shown in the helper.
+2. Install the APK on the phone: click **Open Bluetooth sender**, choose your
+   phone, then browse to the APK path shown in MouseBoard (**Copy path** and
+   **Show APK** help). Accept the file on the phone and install it.
+3. If the phone is already paired with this PC, click **Remove pairing** (and
+   remove the PC on the phone). An earlier pairing has no mouse service.
+4. On the phone open MouseBoard, allow Nearby devices and tap **Connect → Pair
+   new computer → Make visible**. On the PC click **Add device** → Bluetooth and
+   choose the phone. Confirm the code; the phone connects automatically. The
+   **Troubleshoot** panel should show **[W0] connected as a mouse and keyboard**.
 5. In the phone's Settings, turn off **Mac gesture shortcuts**. Use Recenter,
    the click/drag pads or Touchpad mode, and the phone keyboard. Set Windows
    input language to **US** for typing.
@@ -25,7 +27,10 @@ The EXE includes the Android APK and all required .NET runtime files. It
 extracts a verified, versioned APK to `%LOCALAPPDATA%\MouseBoard\Installers`.
 You can move the EXE anywhere without keeping other files next to it.
 
-The device list shows system pairing, not proof of an active mouse connection.
+The device list shows each pairing and whether Windows installed the mouse
+service (**mouse service ✓**). **Copy diagnostics** copies a report with services,
+Bluetooth/HID device nodes and recent events; logs are kept in
+`%LOCALAPPDATA%\MouseBoard\Logs`.
 If upgrading from an old mouse-only descriptor, remove the old pairing on both
 devices and pair again. You may close the Windows helper after installation.
 

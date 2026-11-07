@@ -29,12 +29,21 @@ blocks the first launch.
 
 ## Get started
 
-1. Pair the Android phone with the computer.
-2. Install the Android APK from the download above, or use the desktop app to
-   send the included APK over Bluetooth.
-3. Install the APK, open **MouseBoard**, allow **Nearby devices**, and tap
-   **Connect**.
-4. Select the computer, hold the phone screen-up, and tap **Recenter**.
+1. Install the Android APK from the download above, or use the desktop app to
+   send the included APK over Bluetooth. Open **MouseBoard** and allow
+   **Nearby devices**.
+2. **First time (required on Windows):** if the phone and computer are already
+   paired, remove that pairing on both. On the phone tap **Connect → Pair new
+   computer → Make visible**, then add the phone from the computer's Bluetooth
+   settings (Windows: **Add device → Bluetooth**). MouseBoard connects on its own.
+   Pairing *before* MouseBoard is in pairing mode leaves the computer without the
+   mouse/keyboard service, so nothing moves.
+3. Later: tap **Connect** and choose the computer. Hold the phone screen-up and
+   tap **Recenter**.
+
+If it still fails, tap the status line on the phone (or **⋯ → Diagnostics**) and
+use **Copy diagnostics** in the Windows app; both list error codes and recent
+Bluetooth events.
 
 See [installation and controls](docs/setup.md) for detailed instructions and
 current limits. The Android controller supports Android 9+ devices whose firmware

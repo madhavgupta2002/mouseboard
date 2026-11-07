@@ -21,6 +21,7 @@ import android.os.SystemClock;
 /** Owns the HID connection and sensors independently of the visible activity. */
 public final class MouseBoardService extends Service implements SensorEventListener {
     private static final String CONNECT = "dev.airmouse.CONNECT";
+    private static final String PAIR = "dev.airmouse.PAIR";
     private static final String STOP = "dev.airmouse.STOP";
     private static final String PAUSE = "dev.airmouse.PAUSE";
     private static final String CHANNEL = "mouseboard_connection";
@@ -44,6 +45,7 @@ public final class MouseBoardService extends Service implements SensorEventListe
 
     @Override public void onCreate() {
         super.onCreate();
+        DiagnosticLog.init(this);
         preferences = getSharedPreferences("airmouse", MODE_PRIVATE);
         touchpad = preferences.getBoolean("touchpad", false);
         sensors = (SensorManager)getSystemService(SENSOR_SERVICE);
@@ -55,6 +57,10 @@ public final class MouseBoardService extends Service implements SensorEventListe
         connection = new HidMouseConnection(this, bluetooth == null ? null : bluetooth.getAdapter(),
             (message, paired, busy) -> {
                 stateText = message; connected = paired; connecting = busy;
+                String name = connection.targetName();
+                if (!name.isEmpty()) deviceName = name;
+                if (paired && connection.targetAddress() != null)
+                    preferences.edit().putString("lastAddress", connection.targetAddress()).apply();
                 if (!paired) paused = false;
                 updateSensors();
                 if (!paired && !busy) endForeground();
@@ -77,9 +83,29 @@ public final class MouseBoardService extends Service implements SensorEventListe
             .putExtra("address", device.getAddress()));
     }
 
+    /** Registers the mouse and waits for a computer to pair/connect to the phone. */
+    void startPairing() {
+        startForegroundService(new Intent(this, MouseBoardService.class).setAction(PAIR));
+    }
+
+    String diagnostics() {
+        BluetoothManager manager = (BluetoothManager)getSystemService(BLUETOOTH_SERVICE);
+        String state = "connected=" + connected + " connecting=" + connecting + " paused=" + paused +
+            " touchpad=" + touchpad + " status=\"" + stateText + "\"";
+        return DiagnosticLog.report(this, manager == null ? null : manager.getAdapter(), state, connection::stateOf);
+    }
+
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) return START_NOT_STICKY;
-        if (CONNECT.equals(intent.getAction())) {
+        if (PAIR.equals(intent.getAction())) {
+            foreground = true;
+            deviceName = "a new computer";
+            paused = false; connected = false; connecting = true;
+            stateText = "Preparing pairing mode…";
+            startForeground(NOTIFICATION, notification());
+            updateSensors(); notifyUi();
+            connection.start(null);
+        } else if (CONNECT.equals(intent.getAction())) {
             foreground = true;
             startForeground(NOTIFICATION, notification());
             try {
@@ -91,8 +117,9 @@ public final class MouseBoardService extends Service implements SensorEventListe
                 updateSensors(); notifyUi(); updateNotification();
                 connection.start(device);
             } catch (RuntimeException error) {
+                DiagnosticLog.log("Service connect failed: " + error);
                 stop();
-                stateText = "Could not start Bluetooth. Check Nearby devices permission.";
+                stateText = "Could not start Bluetooth (" + error.getClass().getSimpleName() + "). Check Nearby devices permission. [E14]";
                 notifyUi();
             }
         } else if (STOP.equals(intent.getAction())) stop();
@@ -126,6 +153,7 @@ public final class MouseBoardService extends Service implements SensorEventListe
         stopSelf();
     }
     void stop() {
+        DiagnosticLog.log("User/system stopped MouseBoard");
         connection.stop();
         connected = connecting = paused = false;
         stateText = "Disconnected";

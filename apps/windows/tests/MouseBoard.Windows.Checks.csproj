@@ -8,5 +8,7 @@
   <ItemGroup>
     <Compile Include="../BluetoothDevices.cs" Link="BluetoothDevices.cs" />
     <Compile Include="../InstallerPaths.cs" Link="InstallerPaths.cs" />
+    <Compile Include="../DiagnosticLog.cs" Link="DiagnosticLog.cs" />
+    <Compile Include="../Diagnosis.cs" Link="Diagnosis.cs" />
   </ItemGroup>
 </Project>

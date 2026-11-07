@@ -117,6 +117,21 @@ characters are rejected with a message rather than partially typed.
 
 ## Troubleshooting
 
+**"Connected" in Bluetooth settings but nothing moves (common on Windows).**
+Android/Windows can show the phone as connected for phone/audio services while
+the MouseBoard mouse link is not running. The Windows app reports this as
+**[W5] paired as a phone only**. Fix: in the Windows app click **Remove
+pairing** (or remove the phone in Windows Bluetooth settings) and remove the PC
+on the phone, then on the phone tap **Connect → Pair new computer → Make
+visible** and add the phone from **Add device → Bluetooth** on the PC.
+
+**Diagnostics.** On the phone tap the status line or **⋯ → Diagnostics** to
+view, copy or share a report: permissions, paired devices with their mouse-link
+state and timestamped Bluetooth events. Error codes `[E1]`–`[E14]` identify the
+exact failure. The Windows app's **Copy diagnostics** lists each paired device's
+installed services (look for *HID mouse/keyboard*), Bluetooth/HID device nodes
+and recent events; its daily log is in `%LOCALAPPDATA%\MouseBoard\Logs`.
+
 - Keep Bluetooth on. Open MouseBoard to start a connection; its service then
   maintains it in the background.
 - Check the phone's Nearby devices permission.

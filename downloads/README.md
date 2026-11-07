@@ -1,6 +1,6 @@
 # MouseBoard downloads
 
-Version **0.5.1**. These files are ready to run; no development tools are needed.
+Version **0.6.0**. These files are ready to run; no development tools are needed.
 
 | Platform | File |
 | --- | --- |

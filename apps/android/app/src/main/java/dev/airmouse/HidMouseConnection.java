@@ -12,7 +12,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/** Android is the Bluetooth HID mouse; macOS is the standard HID host. */
+/** Android is the Bluetooth HID mouse; the computer (Mac or Windows) is the standard HID host. */
 final class HidMouseConnection {
     interface Listener { void changed(String message, boolean connected, boolean connecting); }
     private final Context context;
@@ -29,6 +29,7 @@ final class HidMouseConnection {
     private boolean centerPending;
     private double horizontalWheel;
     private volatile long generation;
+    private volatile boolean pairingMode;
 
     HidMouseConnection(Context context, BluetoothAdapter adapter, Listener listener) {
         this.context = context.getApplicationContext();
@@ -37,19 +38,25 @@ final class HidMouseConnection {
         sender.scheduleAtFixedRate(this::sendNext, 0, 16, TimeUnit.MILLISECONDS);
     }
 
+    /** Starts the HID mouse. A null device waits for any computer to pair and connect. */
     void start(BluetoothDevice device) {
         stop();
         final long id = generation;
         target = device;
         active = true;
-        publish(id, "Starting Bluetooth mouse…", false, true);
+        final boolean pairing = device == null;
+        pairingMode = pairing;
+        DiagnosticLog.log(pairing ? "START pairing mode: registering mouse, waiting for a computer"
+            : "START connect to " + describe(device));
+        publish(id, pairing ? "Preparing pairing mode…" : "Starting Bluetooth mouse…", false, true);
         try {
             if (adapter == null || !adapter.isEnabled()) {
-                fail(id, "Turn on Bluetooth, then select your Mac."); return;
+                fail(id, "Bluetooth is off. Turn on Bluetooth, then tap Connect."); return;
             }
             boolean requested = adapter.getProfileProxy(context, new BluetoothProfile.ServiceListener() {
                 @Override public void onServiceConnected(int profile, BluetoothProfile proxy) {
                     main.post(() -> {
+                        DiagnosticLog.log("HID profile proxy ready (attempt " + id + ")");
                         if (id != generation) {
                             adapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, proxy); return;
                         }
@@ -58,19 +65,26 @@ final class HidMouseConnection {
                     });
                 }
                 @Override public void onServiceDisconnected(int profile) {
-                    fail(id, "Bluetooth mouse service disconnected. Tap Connect to retry.");
+                    DiagnosticLog.log("HID profile proxy disconnected by Android");
+                    fail(id, "Android stopped the Bluetooth mouse service. Tap Connect to retry. [E1]");
                 }
             }, BluetoothProfile.HID_DEVICE);
+            DiagnosticLog.log("getProfileProxy(HID_DEVICE) returned " + requested);
             if (!requested) {
-                fail(id, "This phone did not expose the Bluetooth HID device profile."); return;
+                fail(id, "This phone does not offer the Bluetooth HID device profile. [E2]"); return;
             }
             main.postDelayed(() -> {
-                if (id == generation && !connected) {
-                    fail(id, "Mac did not accept the mouse connection. Keep this app open, remove the phone from Mac Bluetooth settings, pair again, then retry.");
-                }
-            }, 20000);
+                if (id != generation || connected) return;
+                BluetoothDevice current = target;
+                String detail = current == null ? "no computer connected" : "state=" + stateOf(current);
+                DiagnosticLog.log("TIMEOUT waiting for computer (" + detail + ")");
+                fail(id, pairing
+                    ? "No computer connected. On the PC open Bluetooth → Add device and pick this phone while MouseBoard is in pairing mode. [E3]"
+                    : "The computer did not accept the mouse link (" + detail + "). Remove this phone from the PC's Bluetooth list, then use ⋯ → Pair new computer. [E4]");
+            }, pairing ? 180000 : 25000);
         } catch (SecurityException denied) {
-            fail(id, "Allow Nearby devices permission for MouseBoard.");
+            DiagnosticLog.log("SecurityException in start: " + denied.getMessage());
+            fail(id, "Allow Nearby devices permission for MouseBoard. [E5]");
         }
     }
 
@@ -83,33 +97,66 @@ final class HidMouseConnection {
         try {
             boolean accepted = service.registerApp(settings, null, null, main::post, new BluetoothHidDevice.Callback() {
                 @Override public void onAppStatusChanged(BluetoothDevice pluggedDevice, boolean registered) {
+                    DiagnosticLog.log("onAppStatusChanged registered=" + registered +
+                        " plugged=" + (pluggedDevice == null ? "none" : describe(pluggedDevice)));
                     if (id != generation) return;
                     if (!registered) {
-                        fail(id, "The Bluetooth mouse app stopped. Close other Bluetooth keyboard/mouse apps and retry."); return;
+                        fail(id, "Android unregistered the Bluetooth mouse. Close other Bluetooth keyboard/mouse apps and retry. [E6]"); return;
                     }
-                    BluetoothDevice device = target;
                     BluetoothHidDevice proxy = hid;
-                    if (device == null || proxy == null) return;
+                    if (proxy == null) return;
+                    BluetoothDevice device = target;
                     try {
+                        logConnectedHosts(proxy);
+                        if (device == null) {
+                            // Pairing mode: the computer initiates. Adopt one that is already linked.
+                            java.util.List<BluetoothDevice> linked = proxy.getConnectedDevices();
+                            if (!linked.isEmpty()) { target = linked.get(0); becameConnected(id, target); return; }
+                            publish(id, "Pairing mode · on the PC choose Bluetooth → Add device → " + adapterName(), false, true);
+                            return;
+                        }
                         publish(id, "Connecting to " + deviceName(device) + "…", false, true);
                         int state = proxy.getConnectionState(device);
+                        DiagnosticLog.log("Mouse link state before connect: " + DiagnosticLog.state(state));
                         if (state == BluetoothProfile.STATE_CONNECTED) {
                             becameConnected(id, device);
-                        } else if (state != BluetoothProfile.STATE_CONNECTING && !proxy.connect(device)) {
-                            fail(id, "Mac refused the mouse connection. Keep MouseBoard open and pair the phone again in Mac Bluetooth settings.");
+                        } else if (state != BluetoothProfile.STATE_CONNECTING) {
+                            boolean started = proxy.connect(device);
+                            DiagnosticLog.log("connect(" + describe(device) + ") returned " + started);
+                            if (!started) fail(id, "Android refused to start the mouse link to " + deviceName(device) +
+                                ". Remove the phone on the PC, then use ⋯ → Pair new computer. [E7]");
                         }
-                    } catch (SecurityException denied) { fail(id, "Allow Nearby devices permission for MouseBoard."); }
+                    } catch (SecurityException denied) { fail(id, "Allow Nearby devices permission for MouseBoard. [E5]"); }
                 }
                 @Override public void onConnectionStateChanged(BluetoothDevice device, int state) {
-                    if (id != generation || !isTarget(device)) return;
+                    DiagnosticLog.log("onConnectionStateChanged " + describe(device) + " → " + DiagnosticLog.state(state) +
+                        (isTarget(device) ? "" : " (not selected computer)"));
+                    if (id != generation) return;
+                    if (!isTarget(device)) {
+                        // The computer connected on its own (common on Windows after pairing).
+                        // Accept it unless we are already in use with another computer.
+                        if (connected || state != BluetoothProfile.STATE_CONNECTED &&
+                                state != BluetoothProfile.STATE_CONNECTING) return;
+                        DiagnosticLog.log("Accepting mouse link started by " + describe(device));
+                        target = device;
+                    }
                     if (state == BluetoothProfile.STATE_CONNECTED) becameConnected(id, device);
                     else if (state == BluetoothProfile.STATE_DISCONNECTED) {
-                        fail(id, "Mac disconnected. Tap Connect to reconnect.");
+                        if (pairingMode && !connected) {
+                            // Windows often opens and closes the link while it finishes pairing.
+                            DiagnosticLog.log("Pairing mode: link closed before use; still waiting");
+                            target = null;
+                            publish(id, "Pairing mode · waiting for the PC to finish connecting…", false, true);
+                            return;
+                        }
+                        fail(id, connected ? deviceName(device) + " disconnected. Tap Connect to reconnect. [E8]"
+                            : deviceName(device) + " closed the mouse link right away. On the PC remove this phone from Bluetooth, then use ⋯ → Pair new computer. [E9]");
                     } else if (state == BluetoothProfile.STATE_CONNECTING) {
                         publish(id, "Connecting to " + deviceName(device) + "…", false, true);
                     }
                 }
                 @Override public void onGetReport(BluetoothDevice device, byte type, byte reportId, int size) {
+                    DiagnosticLog.log("onGetReport type=" + type + " id=" + reportId);
                     if (id != generation || !isTarget(device) || hid == null) return;
                     try {
                         byte[] value = reportId == HidDescriptor.MOUSE ? reports.current()
@@ -118,9 +165,10 @@ final class HidMouseConnection {
                         if (type == BluetoothHidDevice.REPORT_TYPE_INPUT && value != null) {
                             hid.replyReport(device, type, reportId, value);
                         } else hid.reportError(device, BluetoothHidDevice.ERROR_RSP_INVALID_RPT_ID);
-                    } catch (SecurityException denied) { fail(id, "Bluetooth permission was revoked."); }
+                    } catch (SecurityException denied) { fail(id, "Bluetooth permission was revoked. [E5]"); }
                 }
                 @Override public void onSetReport(BluetoothDevice device, byte type, byte reportId, byte[] data) {
+                    DiagnosticLog.log("onSetReport type=" + type + " id=" + reportId);
                     if (id != generation || !isTarget(device) || hid == null) return;
                     try {
                         boolean led = type == BluetoothHidDevice.REPORT_TYPE_OUTPUT &&
@@ -129,26 +177,29 @@ final class HidMouseConnection {
                         hid.reportError(device, led ? BluetoothHidDevice.ERROR_RSP_SUCCESS :
                             BluetoothHidDevice.ERROR_RSP_UNSUPPORTED_REQ);
                     }
-                    catch (SecurityException denied) { fail(id, "Bluetooth permission was revoked."); }
+                    catch (SecurityException denied) { fail(id, "Bluetooth permission was revoked. [E5]"); }
                 }
                 @Override public void onInterruptData(BluetoothDevice device, byte reportId, byte[] data) {
                     if (id == generation && isTarget(device) && reportId == HidDescriptor.KEYBOARD &&
                             data != null && data.length == 1) keyboard.setCapsLock((data[0] & 2) != 0);
                 }
                 @Override public void onSetProtocol(BluetoothDevice device, byte protocol) {
-                    // The composite descriptor uses report protocol (modern macOS).
+                    DiagnosticLog.log("onSetProtocol " + (protocol == BluetoothHidDevice.PROTOCOL_REPORT_MODE ? "report" : "boot"));
+                    // The composite descriptor uses report protocol.
                     if (id == generation && isTarget(device) &&
                             protocol != BluetoothHidDevice.PROTOCOL_REPORT_MODE && hid != null) {
                         try { hid.reportError(device, BluetoothHidDevice.ERROR_RSP_UNSUPPORTED_REQ); }
-                        catch (SecurityException denied) { fail(id, "Bluetooth permission was revoked."); }
+                        catch (SecurityException denied) { fail(id, "Bluetooth permission was revoked. [E5]"); }
                     }
                 }
                 @Override public void onVirtualCableUnplug(BluetoothDevice device) {
-                    if (isTarget(device)) fail(id, "Mac removed the mouse. Pair the phone again before reconnecting.");
+                    DiagnosticLog.log("onVirtualCableUnplug " + describe(device));
+                    if (isTarget(device)) fail(id, deviceName(device) + " removed the mouse. Use ⋯ → Pair new computer to pair again. [E10]");
                 }
             });
-            if (!accepted) fail(id, "Could not register a Bluetooth mouse. Close other phone keyboard/mouse apps and retry.");
-        } catch (SecurityException denied) { fail(id, "Allow Nearby devices permission for MouseBoard."); }
+            DiagnosticLog.log("registerApp returned " + accepted);
+            if (!accepted) fail(id, "Could not register the Bluetooth mouse. Close other phone keyboard/mouse apps, toggle Bluetooth off/on and retry. [E11]");
+        } catch (SecurityException denied) { fail(id, "Allow Nearby devices permission for MouseBoard. [E5]"); }
     }
 
     private void becameConnected(long id, BluetoothDevice device) {
@@ -156,12 +207,46 @@ final class HidMouseConnection {
         connected = true;
         reports.clear();
         keyboard.clear();
+        DiagnosticLog.log("CONNECTED as mouse+keyboard to " + describe(device));
         publish(id, "Bluetooth connected · " + deviceName(device), true, false);
     }
 
     private boolean isTarget(BluetoothDevice device) {
         BluetoothDevice current = target;
         return current != null && current.equals(device);
+    }
+
+    String targetName() { BluetoothDevice device = target; return device == null ? "" : deviceName(device); }
+    String targetAddress() { BluetoothDevice device = target; return device == null ? null : device.getAddress(); }
+
+    /** Mouse-link state for diagnostics; "?" when the HID proxy is not open. */
+    String stateOf(BluetoothDevice device) {
+        BluetoothHidDevice proxy = hid;
+        if (proxy == null) return "inactive";
+        try { return DiagnosticLog.state(proxy.getConnectionState(device)); }
+        catch (RuntimeException error) { return "error " + error.getClass().getSimpleName(); }
+    }
+
+    private void logConnectedHosts(BluetoothHidDevice proxy) {
+        try {
+            StringBuilder names = new StringBuilder();
+            for (BluetoothDevice device : proxy.getConnectedDevices()) names.append(describe(device)).append(' ');
+            DiagnosticLog.log("Mouse links already open: " + (names.length() == 0 ? "none" : names.toString().trim()));
+        } catch (RuntimeException ignored) { }
+    }
+
+    private String adapterName() {
+        try { String name = adapter.getName(); return name == null ? "this phone" : name; }
+        catch (SecurityException denied) { return "this phone"; }
+    }
+
+    static String describe(BluetoothDevice device) {
+        if (device == null) return "none";
+        String address = device.getAddress();
+        // Keep the vendor prefix and last byte; enough to tell devices apart in a shared log.
+        String shortAddress = address == null || address.length() < 17 ? String.valueOf(address)
+            : address.substring(0, 8) + ":…:" + address.substring(15);
+        return "\"" + deviceName(device) + "\" " + shortAddress;
     }
 
     void move(double x, double y) { if (connected && active) reports.move(x, y); }
@@ -242,11 +327,11 @@ final class HidMouseConnection {
                 }
                 byte[] report = reports.next();
                 if (report != null && !proxy.sendReport(device, HidDescriptor.MOUSE, report)) {
-                    fail(id, "Bluetooth could not send mouse input. Tap Connect to retry."); return;
+                    fail(id, "Bluetooth could not send mouse input; the computer may have dropped the link. Tap Connect to retry. [E13]"); return;
                 }
                 byte[] keys = keyboard.next();
                 if (keys != null && !proxy.sendReport(device, HidDescriptor.KEYBOARD, keys)) {
-                    fail(id, "Bluetooth could not send keyboard input. Tap Connect to retry."); return;
+                    fail(id, "Bluetooth could not send keyboard input. Tap Connect to retry. [E13]"); return;
                 }
                 // Shift+wheel is understood as horizontal scrolling by many desktop
                 // applications. Serialize it only between complete keyboard edits.
@@ -257,11 +342,14 @@ final class HidMouseConnection {
                     if (!proxy.sendReport(device, HidDescriptor.KEYBOARD, shift) ||
                         !proxy.sendReport(device, HidDescriptor.MOUSE, wheel) ||
                         !proxy.sendReport(device, HidDescriptor.KEYBOARD, new byte[8])) {
-                        fail(id, "Bluetooth could not send scrolling. Tap Connect to retry."); return;
+                        fail(id, "Bluetooth could not send scrolling. Tap Connect to retry. [E13]"); return;
                     }
                     horizontalWheel -= horizontal;
                 }
-            } catch (RuntimeException error) { fail(id, "Bluetooth connection lost. Tap Connect to retry."); }
+            } catch (RuntimeException error) {
+                DiagnosticLog.log("sendReport threw " + error);
+                fail(id, "Bluetooth connection lost (" + error.getClass().getSimpleName() + "). Tap Connect to retry. [E12]");
+            }
         }
     }
 
@@ -278,6 +366,7 @@ final class HidMouseConnection {
     }
 
     void stop() {
+        if (hid != null || target != null) DiagnosticLog.log("STOP mouse link" + (connected ? " (was connected)" : ""));
         BluetoothHidDevice proxy;
         BluetoothDevice device;
         synchronized (outputLock) {
@@ -308,6 +397,7 @@ final class HidMouseConnection {
     private void fail(long id, String message) {
         main.post(() -> {
             if (id != generation) return;
+            DiagnosticLog.log("FAIL " + message);
             stop();
             listener.changed(message, false, false);
         });

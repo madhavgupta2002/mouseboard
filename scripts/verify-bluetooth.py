@@ -14,6 +14,7 @@ expected = {
     "android.permission.BLUETOOTH",
     "android.permission.BLUETOOTH_ADMIN",
     "android.permission.BLUETOOTH_CONNECT",
+    "android.permission.BLUETOOTH_ADVERTISE",
     "android.permission.FOREGROUND_SERVICE",
     "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE",
     "android.permission.WAKE_LOCK",
@@ -23,8 +24,8 @@ assert names == expected, f"Unexpected APK permissions: {names}"
 assert "android.permission.INTERNET" not in permissions
 print("PASS: APK requests Bluetooth and background-service permissions, with no Internet access")
 assert "minSdkVersion:'28'" in badging
-assert "versionCode='8'" in badging
-assert "versionName='0.5.1'" in badging
+assert "versionCode='9'" in badging
+assert "versionName='0.6.0'" in badging
 print("PASS: Bluetooth APK version and Android 9 minimum are correct")
 assert "uses-feature: name='android.hardware.bluetooth'" in badging
 print("PASS: APK declares Bluetooth hardware support")

@@ -45,7 +45,7 @@ public final class MainActivity extends Activity {
     private static final int BLACK = Color.BLACK, PANEL = Color.rgb(10, 10, 10);
     private static final int LINE = Color.rgb(38, 38, 38), TEXT = Color.rgb(245, 245, 245);
     private static final int MUTED = Color.rgb(145, 145, 145);
-    private static final int BLUETOOTH_PERMISSION = 10, ENABLE_BLUETOOTH = 11;
+    private static final int BLUETOOTH_PERMISSION = 10, ENABLE_BLUETOOTH = 11, PAIR_PERMISSION = 13, DISCOVERABLE = 14;
     private MouseBoardService connection;
     private BluetoothAdapter adapter;
     private SharedPreferences preferences;
@@ -58,10 +58,10 @@ public final class MainActivity extends Activity {
     private LinearLayout mainPanel, dimPanel;
     private TouchpadView touchpadView, dimTouchpad;
     private ClickPad leftPad, rightPad;
-    private boolean connected, connecting, paused, turnMode, keyboardVisible, touchpadMode, dim, bound;
+    private boolean connected, connecting, paused, turnMode, keyboardVisible, touchpadMode, dim, bound, pendingPair;
     private long lastInputError;
     private double gain;
-    private String stateText = "Connect to your Mac";
+    private String stateText = "Not connected · tap Connect and choose your computer";
     private String selectedMac = "";
     private final MouseBoardService.Listener serviceListener = () -> {
         connected = connection.connected; connecting = connection.connecting;
@@ -88,6 +88,8 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        DiagnosticLog.init(this);
+        DiagnosticLog.log("App opened");
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         getWindow().setStatusBarColor(BLACK);
         getWindow().setNavigationBarColor(BLACK);
@@ -137,10 +139,12 @@ public final class MainActivity extends Activity {
         header.addView(settings, gear);
         root.addView(header);
         status = label(stateText, 11, MUTED);
-        status.setMaxLines(2);
+        status.setMaxLines(3);
+        status.setMinHeight(dp(34));
         status.setEllipsize(TextUtils.TruncateAt.END);
         status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
-        root.addView(status, new LinearLayout.LayoutParams(-1, dp(34)));
+        status.setOnClickListener(view -> showDiagnostics());
+        root.addView(status, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout controls = new LinearLayout(this);
         recenterButton = button("Recenter", true);
@@ -228,12 +232,12 @@ public final class MainActivity extends Activity {
         editor.setTextColor(TEXT);
         editor.setHintTextColor(MUTED);
         editor.setTextSize(14);
-        editor.setHint("Type on your Mac…");
+        editor.setHint("Type on your computer…");
         editor.setBackgroundColor(Color.TRANSPARENT);
         editor.setPadding(0, 0, 0, 0);
         editor.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS);
         keyboardPanel.addView(editor, new LinearLayout.LayoutParams(-1, dp(40)));
-        keyboardHint = label("Tap to open your phone keyboard\n\nClick a text field on your Mac first", 13, MUTED);
+        keyboardHint = label("Tap to open your phone keyboard\n\nClick a text field on your computer first", 13, MUTED);
         keyboardHint.setGravity(Gravity.CENTER);
         keyboardHint.setLineSpacing(dp(4), 1);
         keyboardHint.setOnClickListener(view -> showKeyboard());
@@ -367,7 +371,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showKeyboard() {
-        if (!connected || paused) { toast("Connect and resume MouseBoard first"); return; }
+        if (!connected || paused) { explainNotReady(); return; }
         releaseTouches();
         editor.requestFocus();
         editor.post(() -> ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE))
@@ -428,7 +432,10 @@ public final class MainActivity extends Activity {
             setBackground(outline(PANEL, 12));
         }
         @Override public boolean onTouchEvent(MotionEvent event) {
-            if (!isEnabled() || connection == null) return false;
+            if (!isEnabled() || connection == null) {
+                if (event.getActionMasked() == MotionEvent.ACTION_UP) explainNotReady();
+                return true;
+            }
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     editor.finishInput();
@@ -478,18 +485,104 @@ public final class MainActivity extends Activity {
         List<BluetoothDevice> devices = new ArrayList<>(adapter.getBondedDevices());
         devices.sort((a,b) -> isComputer(a) != isComputer(b) ? (isComputer(a) ? -1 : 1)
             : HidMouseConnection.deviceName(a).compareToIgnoreCase(HidMouseConnection.deviceName(b)));
-        if (devices.isEmpty()) {
-            new AlertDialog.Builder(this).setTitle("Pair your computer")
-                .setMessage("Pair in Bluetooth settings, then return to MouseBoard.")
-                .setPositiveButton("Bluetooth settings", (d,w) -> openBluetooth())
-                .setNegativeButton("Cancel", null).show(); return;
-        }
-        String[] names = new String[devices.size()];
-        for (int i=0; i<devices.size(); i++) names[i] = HidMouseConnection.deviceName(devices.get(i));
+        DiagnosticLog.log("Connect tapped; " + devices.size() + " paired device(s)");
+        String[] names = new String[devices.size()+1];
+        names[0] = "＋ Pair new computer (recommended for Windows)";
+        for (int i=0; i<devices.size(); i++) names[i+1] = HidMouseConnection.deviceName(devices.get(i));
         new AlertDialog.Builder(this).setTitle("Choose your computer").setItems(names, (d,index) -> {
+            if (index == 0) { pairNewComputer(); return; }
+            BluetoothDevice device = devices.get(index-1);
+            DiagnosticLog.log("User chose " + HidMouseConnection.describe(device));
             selectedMac = names[index]; editor.resetContext(); paused = false; connecting = true;
-            stateText = "Connecting…"; connection.start(devices.get(index)); refreshState();
+            stateText = "Connecting…"; connection.start(device); refreshState();
         }).setNegativeButton("Cancel", null).show();
+    }
+
+    /** Tells the user exactly why input is disabled instead of a generic hint. */
+    private void explainNotReady() {
+        if (connection == null) { toast("MouseBoard is still starting. Try again in a second."); return; }
+        if (paused) { toast("MouseBoard is paused. Tap Resume."); return; }
+        if (connecting) { toast("Still connecting: " + stateText); return; }
+        new AlertDialog.Builder(this).setTitle("Mouse not connected")
+            .setMessage("Your phone may show the computer as paired or connected in Android Bluetooth settings, " +
+                "but that is not the MouseBoard mouse link.\n\nLast status: " + stateText + "\n\n" +
+                "Windows: remove this phone from the PC's Bluetooth list, then tap Pair new computer and add the phone from the PC.\n" +
+                "Mac or already paired with MouseBoard: tap Connect and choose your computer.")
+            .setPositiveButton("Pair new computer", (d,w) -> pairNewComputer())
+            .setNeutralButton("Diagnostics", (d,w) -> showDiagnostics())
+            .setNegativeButton("Connect", (d,w) -> connectOrDisconnect()).show();
+    }
+
+    /** Registers the HID mouse first so the computer sees a mouse/keyboard while pairing. */
+    private void pairNewComputer() {
+        if (connection == null || adapter == null) return;
+        if (Build.VERSION.SDK_INT >= 31) {
+            List<String> missing = new ArrayList<>();
+            for (String permission : new String[]{Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE})
+                if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) missing.add(permission);
+            if (!missing.isEmpty()) { requestPermissions(missing.toArray(new String[0]), PAIR_PERMISSION); return; }
+        }
+        if (!adapter.isEnabled()) {
+            pendingPair = true;
+            startActivityForResult(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), ENABLE_BLUETOOTH); return;
+        }
+        if (Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 12);
+        }
+        DiagnosticLog.log("User started pairing mode");
+        releaseTouches(); hideKeyboard();
+        if (connected || connecting) connection.stop();
+        editor.resetContext(); paused = false; connecting = true; stateText = "Preparing pairing mode…";
+        connection.startPairing(); refreshState();
+        String phone;
+        try { phone = adapter.getName(); } catch (SecurityException denied) { phone = null; }
+        if (phone == null) phone = "this phone";
+        new AlertDialog.Builder(this).setTitle("Pair new computer")
+            .setMessage("1. If the computer is already in this phone's Bluetooth list (or the phone is in the PC's list), remove it on both first.\n\n" +
+                "2. Tap Make visible below.\n\n" +
+                "3. On Windows: Settings → Bluetooth & devices → Add device → Bluetooth → choose \"" + phone + "\". " +
+                "On Mac: System Settings → Bluetooth → Connect next to \"" + phone + "\".\n\n" +
+                "4. Confirm the code on both screens. MouseBoard connects automatically — keep it open until the status says Connected.")
+            .setPositiveButton("Make visible", (d,w) -> makeDiscoverable())
+            .setNegativeButton("Close", null).show();
+    }
+
+    private void makeDiscoverable() {
+        try {
+            startActivityForResult(new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
+                .putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 180), DISCOVERABLE);
+        } catch (RuntimeException error) {
+            DiagnosticLog.log("Discoverable request failed: " + error + "; opening Bluetooth settings");
+            openBluetooth();
+        }
+    }
+
+    private void showDiagnostics() {
+        String report = connection == null ? DiagnosticLog.report(this, adapter, "service not bound", null)
+            : connection.diagnostics();
+        TextView text = label(report, 11, TEXT);
+        text.setTypeface(Typeface.MONOSPACE);
+        text.setTextIsSelectable(true);
+        text.setGravity(Gravity.START);
+        text.setPadding(dp(18), dp(8), dp(18), dp(8));
+        ScrollView scroller = new ScrollView(this);
+        scroller.addView(text);
+        scroller.post(() -> scroller.fullScroll(View.FOCUS_DOWN));
+        new AlertDialog.Builder(this).setTitle("Diagnostics").setView(scroller)
+            .setPositiveButton("Share", (d,w) -> {
+                Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain")
+                    .putExtra(Intent.EXTRA_SUBJECT, "MouseBoard diagnostics")
+                    .putExtra(Intent.EXTRA_TEXT, report);
+                startActivity(Intent.createChooser(send, "Share diagnostics"));
+            })
+            .setNeutralButton("Copy", (d,w) -> {
+                android.content.ClipboardManager clipboard =
+                    (android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("MouseBoard diagnostics", report));
+                toast("Diagnostics copied");
+            })
+            .setNegativeButton("Clear log", (d,w) -> { DiagnosticLog.clear(); toast("Log cleared"); }).show();
     }
 
     private boolean isComputer(BluetoothDevice device) {
@@ -570,7 +663,16 @@ public final class MainActivity extends Activity {
         host.setOnCheckedChangeListener((v,checked) ->
             preferences.edit().putBoolean("macShortcuts", checked).apply());
         panel.addView(host);
-        TextView note = label("Typing: set your Mac input source to ABC / US.\n"+
+        LinearLayout tools = new LinearLayout(this);
+        Button pairButton = button("Pair new computer", false);
+        pairButton.setOnClickListener(v -> pairNewComputer());
+        Button diagnosticsButton = button("Diagnostics", false);
+        diagnosticsButton.setOnClickListener(v -> showDiagnostics());
+        addEqual(tools, pairButton, 44, false); addEqual(tools, diagnosticsButton, 44, true);
+        LinearLayout.LayoutParams toolsArea = new LinearLayout.LayoutParams(-1, dp(44));
+        toolsArea.topMargin = dp(16);
+        panel.addView(tools, toolsArea);
+        TextView note = label("Typing: set your computer's input language to English (US).\n"+
             "Turn off Mac gesture shortcuts when connected to Windows.\n\n"+
             "Touchpad: tap to click, double-tap to double-click. "+
             "Tap, then touch again and move to drag; holding also drags.\n\n"+
@@ -583,7 +685,7 @@ public final class MainActivity extends Activity {
             "A locked/off screen cannot receive taps.\n\n"+
             "Match scrolling to your computer with Reverse touchpad scrolling. "+
             "Horizontal scrolling uses Shift + wheel where supported. "+
-            "Force Click and native trackpad-only gestures are not available.\n\nBluetooth only · v0.5.1", 12, MUTED);
+            "Force Click and native trackpad-only gestures are not available.\n\nBluetooth only · v0.6.0", 12, MUTED);
         note.setPadding(0, dp(20), 0, 0);
         panel.addView(note);
         ScrollView scroller = new ScrollView(this);
@@ -619,13 +721,25 @@ public final class MainActivity extends Activity {
     }
     @Override public void onRequestPermissionsResult(int request, String[] names, int[] result) {
         super.onRequestPermissionsResult(request, names, result);
-        if (request != BLUETOOTH_PERMISSION) return;
-        if (result.length > 0 && result[0] == PackageManager.PERMISSION_GRANTED) connectOrDisconnect();
-        else { stateText = "Allow Nearby devices in app permissions"; refreshState(); }
+        if (request != BLUETOOTH_PERMISSION && request != PAIR_PERMISSION) return;
+        boolean all = result.length > 0;
+        for (int value : result) all &= value == PackageManager.PERMISSION_GRANTED;
+        DiagnosticLog.log("Permission result (" + (request == PAIR_PERMISSION ? "pair" : "connect") + "): " + (all ? "granted" : "DENIED"));
+        if (all) { if (request == PAIR_PERMISSION) pairNewComputer(); else connectOrDisconnect(); }
+        else {
+            stateText = "Nearby devices permission denied. Open Android Settings → Apps → MouseBoard → Permissions → Nearby devices → Allow. [E5]";
+            refreshState();
+        }
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
-        if (request == ENABLE_BLUETOOTH && result == RESULT_OK) connectOrDisconnect();
+        if (request == DISCOVERABLE) {
+            DiagnosticLog.log(result == RESULT_CANCELED ? "User declined making the phone visible" : "Phone visible for " + result + "s");
+            if (result == RESULT_CANCELED) toast("Phone not visible. You can also open phone Bluetooth settings while pairing.");
+            return;
+        }
+        boolean pair = pendingPair; pendingPair = false;
+        if (request == ENABLE_BLUETOOTH && result == RESULT_OK) { if (pair) pairNewComputer(); else connectOrDisconnect(); }
     }
 
     private LinearLayout column() {
