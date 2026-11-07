@@ -11,7 +11,11 @@
     <Product>MouseBoard</Product>
     <Title>MouseBoard</Title>
     <Description>Bluetooth setup companion for the MouseBoard phone controller.</Description>
-    <Version>0.4.0</Version>
+    <Version>0.5.1</Version>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>None</DebugType>
     <ApplicationIcon>Assets/MouseBoard.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <InstallerApk Condition="'$(InstallerApk)' == ''">$(MSBuildThisFileDirectory)../../dist/MouseBoard-Android.apk</InstallerApk>
@@ -19,11 +23,9 @@
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
     <Resource Include="Assets/MouseBoard.ico" />
-    <Content Include="$(InstallerApk)" Condition="Exists('$(InstallerApk)')">
-      <Link>Assets/MouseBoard-Android.apk</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </Content>
+    <EmbeddedResource Include="$(InstallerApk)" Condition="Exists('$(InstallerApk)')">
+      <LogicalName>MouseBoard.Android.apk</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <Target Name="RequirePhoneInstaller" BeforeTargets="PrepareForPublish"
           Condition="!Exists('$(InstallerApk)')">

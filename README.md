@@ -12,11 +12,26 @@ MouseBoard uses standard Bluetooth HID. The desktop apps help with pairing and
 installing the Android controller; input goes directly to the operating system.
 No Wi-Fi connection, account or desktop input-injection service is required.
 
+## Download and open
+
+Ready-to-use builds are committed in [`downloads/`](downloads/). No compiling,
+Java, Python or .NET installation is needed to use them.
+
+| Device | Download | Open it |
+| --- | --- | --- |
+| Windows 10/11, x64 | [MouseBoard-Windows-x64.exe](https://github.com/madhavgupta2002/mouseboard/raw/refs/heads/main/downloads/MouseBoard-Windows-x64.exe) | Double-click the EXE. The Android APK is included. |
+| Mac, Apple Silicon or Intel, macOS 14+ | [MouseBoard-macOS.dmg](https://github.com/madhavgupta2002/mouseboard/raw/refs/heads/main/downloads/MouseBoard-macOS.dmg) | Open the DMG, drag MouseBoard to Applications, then open it. The Android APK is included. |
+| Android 9+ | [MouseBoard-Android.apk](https://github.com/madhavgupta2002/mouseboard/raw/refs/heads/main/downloads/MouseBoard-Android.apk) | Download directly on the phone and install, or transfer it using either desktop app. |
+
+These are personal builds without a commercial signing certificate or Apple
+notarization. See [download and first-open help](downloads/README.md) if your OS
+blocks the first launch.
+
 ## Get started
 
 1. Pair the Android phone with the computer.
-2. Use the macOS or Windows companion to locate and transfer
-   `MouseBoard-Android.apk`.
+2. Install the Android APK from the download above, or use the desktop app to
+   send the included APK over Bluetooth.
 3. Install the APK, open **MouseBoard**, allow **Nearby devices**, and tap
    **Connect**.
 4. Select the computer, hold the phone screen-up, and tap **Recenter**.

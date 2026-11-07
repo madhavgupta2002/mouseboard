@@ -1,8 +1,11 @@
 # Installation and controls
 
+Download the ready-to-open [Windows EXE, Mac DMG or Android APK](../downloads/README.md).
+You do not need to build the project.
+
 ## Android
 
-Install `dist/MouseBoard-Android.apk` on the phone. Desktop companions can help
+Install `MouseBoard-Android.apk` on the phone. Desktop companions can help
 transfer it over Bluetooth. Accept the file, open it, and allow installation
 from the source Android identifies if needed. Managed-device policy can prevent
 installation of locally built APKs.
@@ -28,7 +31,7 @@ on the phone and tap **Connect**.
 
 ## macOS
 
-Open `dist/MouseBoard.app`, or use `Open MouseBoard.command` after building.
+Open the downloaded DMG, drag MouseBoard to Applications, then open it.
 Select the paired phone and choose **Send APK over Bluetooth**. Accept the
 incoming file on the phone.
 
@@ -42,7 +45,8 @@ can be closed after installation.
 ## Windows
 
 Use the [Windows companion](../apps/windows/README.md) to open Bluetooth settings,
-find the Android installer, and start Windows Bluetooth File Transfer. Mouse
+by double-clicking the downloaded `MouseBoard-Windows-x64.exe`. The Android
+installer is included. Start Windows Bluetooth File Transfer from the app. Mouse
 and keyboard input are handled by Windows through the standard HID profile.
 
 ## Controls

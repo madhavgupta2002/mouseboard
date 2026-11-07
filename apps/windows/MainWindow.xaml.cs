@@ -8,7 +8,7 @@ namespace MouseBoard.Windows;
 
 public partial class MainWindow : Window
 {
-    private readonly string? installer = InstallerPaths.Find(AppContext.BaseDirectory);
+    private readonly string? installer = InstallerPaths.FindOrExtract(AppContext.BaseDirectory);
     private readonly DispatcherTimer refreshTimer = new() { Interval = TimeSpan.FromSeconds(10) };
     private bool readingDevices;
 
@@ -16,7 +16,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         PcNameText.Text = Environment.MachineName;
-        InstallerPathBox.Text = installer ?? "Installer missing. Use a complete MouseBoard Windows bundle.";
+        InstallerPathBox.Text = installer ?? "Could not prepare the phone installer. Download the Android APK from the repository.";
         SendButton.IsEnabled = ShowButton.IsEnabled = CopyButton.IsEnabled = installer is not null;
         refreshTimer.Tick += async (_, _) => await RefreshDevices();
         Loaded += async (_, _) => { await RefreshDevices(); refreshTimer.Start(); };

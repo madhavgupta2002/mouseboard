@@ -8,7 +8,8 @@ requires no account or administrator access.
 
 ## Use
 
-1. Extract the complete Windows ZIP, then run `MouseBoard.exe`.
+1. [Download MouseBoard-Windows-x64.exe](https://github.com/madhavgupta2002/mouseboard/raw/refs/heads/main/downloads/MouseBoard-Windows-x64.exe)
+   and double-click it. No installer, ZIP extraction or .NET installation is needed.
 2. Pair the phone in **Bluetooth settings**.
 3. Click **Open Bluetooth sender**. In the Windows wizard choose your phone,
    then browse to the APK path shown in MouseBoard. **Copy path** and **Show APK**
@@ -16,8 +17,13 @@ requires no account or administrator access.
    completed; accept it on the phone.
 4. Install the APK and open MouseBoard on the phone. Allow Nearby devices, tap
    Connect and choose the PC name shown in the helper.
-5. Keep the phone app open. Use Recenter, the click/drag pads, middle scroll
-   strip and phone keyboard. Set the Windows input language to **US** for typing.
+5. In the phone's Settings, turn off **Mac gesture shortcuts**. Use Recenter,
+   the click/drag pads or Touchpad mode, and the phone keyboard. Set Windows
+   input language to **US** for typing.
+
+The EXE includes the Android APK and all required .NET runtime files. It
+extracts a verified, versioned APK to `%LOCALAPPDATA%\MouseBoard\Installers`.
+You can move the EXE anywhere without keeping other files next to it.
 
 The device list shows system pairing, not proof of an active mouse connection.
 If upgrading from an old mouse-only descriptor, remove the old pairing on both
@@ -25,30 +31,26 @@ devices and pair again. You may close the Windows helper after installation.
 
 ## Build
 
-Install the .NET 10 SDK and build `dist/MouseBoard-Android.apk` first.
+Only developers need this section. Install the .NET 10 SDK and Python 3.9+,
+then build `dist/MouseBoard-Android.apk` first.
 From the repository root in PowerShell:
 
 ```powershell
 ./scripts/build-windows.ps1
 ```
 
-This runs portable interop/path checks, publishes a self-contained x64 app, copies
-the APK into `Assets`, verifies its hash, and produces
-`dist/MouseBoard-Windows-win-x64.zip`. The output folder is a unit: extract all
-files together. Users do not need a separate .NET runtime with the default build.
+This publishes a compressed, self-contained x64 EXE, verifies the embedded APK
+and Windows executable architecture, and runs portable interop/extraction
+checks. The result is `dist/MouseBoard-Windows-x64.exe`.
 
 ```powershell
 ./scripts/build-windows.ps1 -Runtime win-arm64
-./scripts/build-windows.ps1 -FrameworkDependent
 ```
 
-A framework-dependent build requires the .NET 10 Desktop Runtime on the target.
-
-For a source compilation check on macOS/Linux with the .NET 10 SDK:
+To build on macOS/Linux with the .NET 10 SDK and Python:
 
 ```sh
-dotnet build apps/windows/MouseBoard.Windows.csproj -c Release
-dotnet run --project apps/windows/tests/MouseBoard.Windows.Checks.csproj -c Release
+python3 scripts/package-windows.py
 ```
 
 `EnableWindowsTargeting` permits compilation on another OS; the WPF app and

@@ -5,6 +5,7 @@
 **/obj/
 dist/
 .DS_Store
+__pycache__/
 *.keystore
 *.jks
 *.p12

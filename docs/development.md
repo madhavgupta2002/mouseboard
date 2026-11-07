@@ -22,6 +22,10 @@ The Windows application has the same setup role as the Mac companion.
 | `bash scripts/test.sh --unit-only` | Run platform-independent Java logic tests |
 | `bash scripts/test.sh` | Run logic tests and verify built APK/Mac artifacts |
 | `powershell -File scripts/build-windows.ps1` | Build/package the Windows companion |
+| `python3 scripts/package-windows.py` | Build a standalone Windows EXE, also on macOS/Linux |
+| `bash scripts/package-mac.sh` | Build the universal Mac app and drag-to-install DMG |
+| `python3 scripts/prepare-downloads.py` | Copy all three finished packages into `downloads/` with hashes |
+| `python3 scripts/verify-downloads.py` | Verify the committed download checksums and binary formats |
 
 The macOS build needs Apple's Command Line Tools. Android builds currently use
 the macOS SDK tools and need Java 17+ and Python 3.9+. `.tools` is a project-local SDK/cache directory, not a global
@@ -154,9 +158,23 @@ default-keyboard behavior or the host's display mapping. Test those after
 installing on a real Android phone and pairing it with each target OS.
 
 Generated artifacts, SDKs, caches and machine-specific screenshots remain
-ignored. Source, tests and documentation are the reproducible repository.
+ignored under `dist/` and `.tools/`. The three end-user packages in `downloads/`
+are intentionally committed so users do not need to compile or sign in to
+download workflow artifacts. Rebuild the platform packages, run
+`prepare-downloads.py`, review the hashes, and commit the updated downloads
+when publishing a new version. Keep each file below GitHub's 100 MiB limit.
 
 GitHub Actions builds the Android installer and both desktop companions. The
 Windows job packages the macOS job's APK, and the macOS job verifies its
 bundled installer. CI generates a temporary development signing key on each
 runner; those APKs do not replace an installation signed with your local key.
+
+The Windows EXE embeds the APK as a manifest resource and bundles compressed
+.NET runtime/native libraries. Runtime extraction needs only the user's local
+app-data/temp directories. Portable tests read the produced assembly's resource
+table without loading its architecture-specific code and compare the embedded
+APK byte-for-byte with the Android build.
+
+The Mac executable contains both arm64 and x86_64 slices targeting macOS 14.
+The DMG includes the app and an Applications shortcut. Local builds are ad-hoc
+signed, not Apple-notarized; Windows builds are not Authenticode-signed.

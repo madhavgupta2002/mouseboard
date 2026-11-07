@@ -10,3 +10,5 @@
 *.icns binary
 *.apk binary
 *.zip binary
+*.exe binary
+*.dmg binary

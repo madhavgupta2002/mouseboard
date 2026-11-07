@@ -75,13 +75,13 @@
                        Foreground="{StaticResource MutedBrush}" />
             <TextBlock Text="Open MouseBoard on your phone, allow Nearby devices, tap Connect and select this PC."
                        Margin="0,12,0,0" FontSize="13" Foreground="{StaticResource MutedBrush}" />
-            <TextBlock Text="Recenter. Then tilt." Margin="0,20,0,5"
+            <TextBlock Text="Tilt or use Touchpad." Margin="0,20,0,5"
                        FontSize="15" FontWeight="SemiBold" />
-            <TextBlock Text="Hold LEFT and tilt to drag. Swipe the middle strip to scroll. Tap Keyboard to type."
+            <TextBlock Text="Tap Touchpad on the phone for familiar gestures. Tap Keyboard to type. Recenter resets the pointer."
                        FontSize="13" Foreground="{StaticResource MutedBrush}" />
-            <TextBlock Text="Keep the phone app open." Margin="0,20,0,5"
+            <TextBlock Text="Choose Windows shortcuts." Margin="0,20,0,5"
                        FontSize="15" FontWeight="SemiBold" />
-            <TextBlock Text="Use the US keyboard layout on Windows. If you upgraded from the old mouse-only version, remove the old pairing and pair again."
+            <TextBlock Text="In the phone's Settings, turn off Mac gesture shortcuts. Use the US keyboard layout for typing. The connection can stay active in the background."
                        FontSize="12" Foreground="{StaticResource MutedBrush}" />
           </StackPanel>
         </Grid>
